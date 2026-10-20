@@ -1,0 +1,184 @@
+---
+name: accessibility-ux
+description: Quantia accessibility and usability rules (WCAG 2.1 AA + Resolución 1519 de 2020, MinTIC). Apply to every route and component. Enforces contrast, non-color status, typography and touch sizes, keyboard and focus, labels and errors, domain language, COP/date/percent formats, accessible charts and tables, live updates without reordering, and skeletons.
+globs: src/app/**, src/components/**
+alwaysApply: false
+---
+
+# Accessibility & UX — Quantia Web
+
+Baseline: WCAG 2.1 AA and Resolución 1519 de 2020 (MinTIC), because Quantia is used in a public
+university context. Target: axe with zero violations and Lighthouse Accessibility ≥ 95 on every route.
+These are build rules, not a review checklist: apply them while writing code.
+
+## 1. Perceivable
+- Contrast ≥ 4.5:1 for normal text; ≥ 3:1 for large text (≥ 24 px, or ≥ 18.66 px bold), icons,
+  control borders and focus rings. Check BOTH themes. Never lower opacity to "soften" text.
+- Color is NEVER the only carrier of meaning. Every status combines color + text + icon/shape.
+  One single source of truth, consumed by `Badge`, `AlertList`, `TaskRow`, `ProjectCard`:
+
+| `ProjectStatus` (contract) | Spanish label | Tone token | Icon shape |
+| --- | --- | --- | --- |
+| `FORMULATION` | En formulación | `theme.colors.text.secondary` (neutral) | Pencil |
+| `ACTIVE` | En curso | `theme.colors.status.info` | Clock |
+| `DELAYED` | Retrasado | `theme.colors.status.danger` | Warning triangle |
+| `COMPLETED` | Finalizado | `theme.colors.status.success` | Check circle |
+| `CANCELLED` | Cancelado | `theme.colors.text.secondary` (neutral) | Crossed circle |
+
+| `TaskStatus` (contract) | Spanish label | Tone token | Icon shape |
+| --- | --- | --- | --- |
+| `TODO` | Por hacer | `theme.colors.text.secondary` (neutral) | Empty circle |
+| `IN_PROGRESS` | En curso | `theme.colors.status.info` | Clock |
+| `BLOCKED` | Bloqueada | `theme.colors.status.warning` | Pause |
+| `DONE` | Hecha | `theme.colors.status.success` | Check circle |
+
+  Alert severity follows the same rule: Crítico (danger) · Atención (warning) · Al día (success).
+
+~~~ts
+// src/components/base/Badge/statusPresentation.ts — the ONLY place that maps status → UI
+// Keys are the contract enums from @quantia/contracts; never lowercase or rename them.
+export const PROJECT_STATUS_PRESENTATION = {
+  FORMULATION: { label: 'En formulación', tone: 'neutral', icon: 'pencil' },
+  ACTIVE:      { label: 'En curso',       tone: 'info',    icon: 'clock' },
+  DELAYED:     { label: 'Retrasado',      tone: 'danger',  icon: 'warning' },
+  COMPLETED:   { label: 'Finalizado',     tone: 'success', icon: 'check' },
+  CANCELLED:   { label: 'Cancelado',      tone: 'neutral', icon: 'x-circle' },
+} as const satisfies Record<ProjectStatus, StatusPresentation>;
+
+export const TASK_STATUS_PRESENTATION = {
+  TODO:        { label: 'Por hacer', tone: 'neutral', icon: 'circle' },
+  IN_PROGRESS: { label: 'En curso',  tone: 'info',    icon: 'clock' },
+  BLOCKED:     { label: 'Bloqueada', tone: 'warning', icon: 'pause' },
+  DONE:        { label: 'Hecha',     tone: 'success', icon: 'check' },
+} as const satisfies Record<TaskStatus, StatusPresentation>;
+// Icons are decorative (aria-hidden="true"); the visible label carries the meaning.
+~~~
+
+- Typography: body `theme.typography.bodyMedium` (16 px, line-height 1.5). Labels, errors, buttons
+  and table cells ≥ 14 px. The 12 px `caption` is only for supplementary metadata, never for
+  labels, errors or anything actionable.
+- Text must survive 200% zoom and reflow at 320 CSS px without loss or page-level horizontal scroll.
+- Touch targets ≥ 44×44 px (IconButton, checkboxes, table row actions, pagination), with spacing
+  tokens between adjacent targets. Mobile matters: Investigadores register progress in the field.
+- Images and icons that convey information have a Spanish text alternative; decorative ones use
+  `aria-hidden="true"` / `alt=""`.
+
+## 2. Operable — keyboard and focus
+- Everything works with the keyboard alone: progress form, filters, tables, tabs, menus, modals,
+  date pickers, file upload. No hover-only content or actions; tooltips also open on focus.
+- Visible focus always: the `focusRing` mixin (2 px, contrast ≥ 3:1) on every interactive element.
+  Never `outline: none` without the ring. Never style `:focus` in a way that hides `:focus-visible`.
+- Skip link as the first focusable element in `src/app/layout.tsx`: "Saltar al contenido principal"
+  → `<main id="main-content" tabIndex={-1}>`.
+- Tab order follows the DOM and the visual order. No positive `tabIndex`. Do not reorder visually
+  with CSS what the DOM orders differently.
+- Modals, side panels ("Registrar avance") and menus use Radix primitives: focus trap, `Esc` closes,
+  focus returns to the trigger. Never hand-roll a modal.
+- Use native elements first (`button`, `a`, `input`, `select`). A clickable `div` is forbidden.
+- Do not trap focus outside overlays; do not auto-move focus except on route change (to the page
+  `h1`), on submit errors (to the first invalid field) and when opening/closing overlays.
+
+## 3. Understandable — forms, errors and language
+- `<html lang="es-CO">`. All UI copy in Spanish.
+- Persistent visible labels (`<label htmlFor>`) for every field. A placeholder is never the label;
+  it may only show an example ("Ej.: 15/10/2026"). Required fields say "(obligatorio)" in text.
+- Errors are text next to the field, linked with `aria-describedby` + `aria-invalid="true"`, and say
+  how to fix it ("Ingresa una fecha con formato DD/MM/AAAA"). Never only a red border or a toast.
+  On submit with errors: focus the first invalid field (and show a summary on long forms).
+- Domain language, never system language. Never show raw status codes, enum values or stack traces:
+
+| Write | Never write |
+| --- | --- |
+| Registrar avance | Crear registro en bitácora |
+| Sincronizando con Notion | sync_status=pending |
+| No tienes permiso para ver esta sección | 403 Forbidden |
+| Tu sesión expiró. Inicia sesión de nuevo | JWT expired / 401 |
+| Generar reporte | Crear job / encolar |
+| Reintentar sincronización | Re-enqueue |
+| Estamos procesando demasiadas solicitudes | 429 Too Many Requests |
+
+- Destructive actions use `ConfirmDialog` with a specific verb ("Eliminar documento"), never "Aceptar".
+
+## 4. Formats — always through `src/lib/format`
+Components never call `Intl`, `toFixed`, `toLocaleString` or date libraries directly.
+
+| Helper | Input | Output |
+| --- | --- | --- |
+| `formatCOP(value)` | decimal string from the API (`"1250000.00"`) or number | `$ 1.250.000` — es-CO, thousands separators, no decimals |
+| `formatDate(value, { withTime? })` | ISO string or Date | `09/10/2026` (`DD/MM/AAAA`), `09/10/2026 14:30` with time; zone America/Bogota |
+| `formatPercent(value)` | number 0–100 | `45,6 %` — max 1 decimal, es-CO separator |
+| `toApiDate(value)` | `DD/MM/AAAA` input or Date | ISO UTC built from 00:00 America/Bogota (date-only fields sent to the API) |
+
+- Empty or invalid input returns "—" (never `NaN`, `Invalid Date` or `undefined`).
+- Money stays a decimal string end to end: `formatCOP` only parses it to display; never add amounts as numbers.
+- Inputs for money, dates and percentages accept and display the same formats.
+
+## 5. Charts and tables
+- Recharts: every chart shows value labels (`LabelList`) and a legend in text; series are
+  distinguishable without color (labels, patterns or markers). Use theme tokens for colors.
+- Every chart is wrapped in `<figure>` with a Spanish `<figcaption>` that states the takeaway
+  ("3 proyectos con ejecución mayor al avance"), and offers "Ver como tabla" rendering an
+  equivalent `DataTable`. Interpreted relations are shown as alerts, not as two numbers to compare.
+- Tables are semantic: `<table>`, `<caption>`, `<th scope="col|row">`, `aria-sort` on sortable headers.
+- Wide tables scroll INSIDE their container; the page never scrolls horizontally:
+
+~~~tsx
+<TableScroll role="region" aria-label="Proyectos de la convocatoria" tabIndex={0}>
+  <table>…</table>
+</TableScroll>
+// TableScroll.styles.ts → overflow-x: auto; max-width: 100%; focusRing on :focus-visible
+~~~
+
+- Empty tables render `EmptyState` with a specific message and next action
+  ("Sin proyectos en esta convocatoria · Cambiar filtros"), never a blank table.
+
+## 6. Live updates, loading and motion
+- D-07: real-time events NEVER reorder, insert above or move content under the cursor or the focus.
+  Update the row in place and highlight it 1–2 s. If an event would change the order, keep the
+  current order and show "Hay actualizaciones · Actualizar" for the user to apply them.
+- Announce changes through a single polite live region (`aria-live="polite"`); use
+  `role="alert"` only for blocking errors (session expired, sync failed for an Administrador).
+  Never move focus because of an incoming event.
+- Loading: `Skeleton` with the final structure; the container gets `aria-busy="true"` and a
+  visually hidden "Cargando…". No full-page spinners; never block global navigation.
+- Motion: 150/200/250 ms tokens, `transform`/`opacity` only, nothing essential conveyed only by
+  animation. Under `prefers-reduced-motion: reduce`, disable shimmer, slides and highlight motion
+  (keep a static highlight).
+- `ConnectionStatus` banner when the socket drops: "Datos posiblemente desactualizados" + "Reconectar".
+
+## 7. Semantics and structure
+- Landmarks: `header`, `nav` (RoleSidebar, with `aria-label`), `main`, `footer`. One `h1` per page;
+  headings in order (`h1` → `h2` → `h3`), never chosen for size.
+- ARIA only when native HTML is not enough; never contradict native semantics.
+- Radix provides the accessible base; Shadcn is a pattern reference only.
+- Keep `eslint-plugin-jsx-a11y` errors at zero; never disable its rules inline.
+
+## 8. Critical DON'Ts
+- Do NOT convey status by color alone or use red/amber/green without label and icon.
+- Do NOT remove `:focus-visible`, use positive `tabIndex` or clickable `div`/`span`.
+- Do NOT use placeholders as labels or show errors only with color or toasts.
+- Do NOT format money, dates or percentages outside `formatCOP`, `formatDate`, `formatPercent`.
+- Do NOT render a chart without value labels and a table equivalent.
+- Do NOT let any route scroll horizontally at 390 px (or 320 px reflow).
+- Do NOT reorder lists or steal focus on real-time events.
+- Do NOT show technical messages, codes or enum values to users.
+
+## 9. Verification before saying it is done
+1. axe: zero violations on every touched route, in all states (loading, empty, error, 403) and both themes.
+2. Lighthouse Accessibility ≥ 95 on every touched route.
+3. Keyboard-only walkthrough of the flow: skip link, tab order, focus visible, `Esc` closes overlays,
+   focus returns to the trigger.
+4. Screen reader smoke test (NVDA or VoiceOver) on F-01, F-02 or F-03 when the change touches them.
+5. 390 / 768 / 1280 px with no page-level horizontal scroll; 200% zoom readable.
+6. `prefers-reduced-motion` emulated: no essential animation, no shimmer.
+7. Statuses show color + text + icon; formats come from `src/lib/format`.
+
+## 10. Related docs (canonical paths)
+
+- `.cursorrules` — product, locked stack, documentation map.
+- `AGENTS.md` — workflow and DoD.
+- `DESIGN.md` — tokens and registered components.
+- `.cursor/docs/SCREENS.md` — screen inventory and role views.
+- `.cursor/docs/frontend-conventions.md` — folders, PR, DoD.
+- `.cursor/rules/ui-design-system.mdc` — UI rule → `DESIGN.md`.
+- `.cursor/rules/api-integration.mdc` — API, session, sockets, roles.

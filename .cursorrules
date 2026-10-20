@@ -1,0 +1,109 @@
+# Quantia Web — Project Rules (always active)
+
+## Product
+Quantia is a web platform to manage research projects of the INNOVATEK'S / GITEMOS research seedbed.
+This repository contains ONLY the frontend client (Next.js). Users have three roles:
+Investigador (Researcher), Coordinador (Coordinator) and Administrador (Administrator).
+Tone: institutional, sober, clear, trustworthy. Color communicates state; it is never decoration.
+Code, components and tokens in English; all user-facing UI copy in Spanish.
+
+## Locked stack — NEVER change without written approval
+- Runtime: Node.js 22 LTS, TypeScript strict mode.
+- Framework: Next.js (App Router) + React. Version pinned in package.json.
+- Styling: Styled Components with a typed `theme` (light + dark) and an SSR registry
+  (`StyleSheetManager` + `useServerInsertedHTML`) so there is no FOUC and no hydration mismatch.
+  Components using styled-components are Client Components ("use client").
+- Primitives: Radix UI (accessible base for dialogs, menus, selects, tooltips, tabs, etc.).
+- Motion: Framer Motion. Charts: Recharts.
+- Real time: Socket.io client against the API (namespaces `/projects`, `/notifications` and `/general`).
+- Data contracts: `@quantia/contracts` (TS types + Zod schemas), shared with the API.
+- Design source of truth: Figma library + `DESIGN.md` (same token/component names in both).
+- Deploy: Vercel (frontend only). API, worker and Redis live on Railway.
+
+## Shadcn policy (decided)
+- Shadcn is a PATTERN REFERENCE only. Never run the Shadcn CLI, never copy its Tailwind classes,
+  never add Tailwind, `clsx`/`tailwind-merge`/`cva` or any Shadcn-generated file.
+- Build every component as: Radix primitive + Styled Components + theme tokens, following Shadcn's
+  composition/anatomy ideas (compound components, `asChild`, controlled/uncontrolled props).
+- A component exists only if it is registered in `DESIGN.md` (and in the Figma library).
+
+## Architecture invariants (non-negotiable)
+1. The Quantia API (`/api/v1`) is the ONLY backend the browser talks to (plus its Socket.io gateway).
+   Never access Supabase, Notion or Redis from the browser, and never import their SDKs.
+2. All request/response types and Zod schemas come from `@quantia/contracts`. Never hand-write or
+   duplicate a contract. If a contract is missing, stop and flag it instead of inventing types.
+3. Navigation and landing view are GENERATED from the roles returned by `GET /users/me` (never by
+   decoding the JWT) (Investigador: "Mis tareas";
+   Coordinador: group dashboard; Administrador: institutional view). Sections without permission
+   are not rendered.
+4. Hiding UI does NOT replace authorization. The API is the authority; always handle 401/403 from it.
+   403 messages never reveal the existence of out-of-scope resources.
+5. One feature folder per domain (`features/projects`, `tasks`, `progress`, `budget`, `reports`,
+   `audit`, `sync`). No business logic inside UI components; use typed hooks/services per feature.
+6. One single API client (silent refresh, one retry, normalized errors). No ad-hoc `fetch` in components.
+7. Real-time events never reorder or move content under the cursor (highlight 1–2 s instead).
+   Socket.io connects to the long-running API, never to Next.js route handlers or serverless functions.
+
+## Design System rules
+- Component names, props and tokens mirror Figma: `intent="primary"`, `size="md"`, `isLoading`,
+  `theme.colors.brand.primary`, `theme.space[4]`, `theme.typography.bodyMedium`.
+- Only theme tokens for color, spacing, radii, elevation, typography and motion. Dark mode is solved
+  in tokens, never per component.
+- Every component implements default, hover, focus-visible, active, disabled, loading and error
+  (when applicable). Reuse registered components in `src/components/{base,system,composite,page}`
+  before creating anything.
+- Always implement technical → visual states: skeleton, empty, error, 401 (session modal),
+  403, 429 (auto retry), sync pending/failed, long job, WebSocket disconnected.
+
+## Security defaults
+- Access JWT in memory only (never localStorage/sessionStorage). Refresh token lives in an httpOnly cookie set
+  by the Next session route handlers (`src/app/api/session/*`); it is never readable by JS.
+- Validate socket payloads always, and API responses in development, with Zod from contracts. Never use `dangerouslySetInnerHTML` with API/user data.
+- Files only via signed short-lived URLs returned by the API.
+- Destructive actions require `ConfirmDialog`. Never log tokens, PII or budget data.
+- Only non-secret values in `NEXT_PUBLIC_*` (API origin, app environment).
+
+## Coding conventions
+- One component per file, props interface `[ComponentName]Props`, TypeScript strict.
+- Every list is paginated (`page`, `pageSize`); filters and sort live in the URL.
+- Formats: COP currency, DD/MM/AAAA dates, percentages with max 1 decimal.
+- Animations 150/200/250 ms, `transform`/`opacity` only, honor `prefers-reduced-motion`.
+- Charts always show visible values and offer a table alternative.
+- Accessibility WCAG 2.1 AA: contrast >= 4.5:1 (3:1 large text/borders), 16 px base text,
+  44x44 px touch targets, full keyboard navigation, persistent labels.
+- Branches `feature/*` -> PR -> `main`. No direct commits to `main`. Conventional Commits.
+
+## Critical DON'Ts
+- Do NOT hardcode hex colors or loose px values (spacing, radii, font sizes, shadows). Use theme tokens.
+- Do NOT create or use components that are not registered in `DESIGN.md`.
+- Do NOT add a new dependency, library or provider without asking first.
+- Do NOT use `any` or `@ts-ignore` / `@ts-expect-error` to silence the compiler.
+- Do NOT put secrets in `NEXT_PUBLIC_*` variables or anywhere in the client bundle.
+- Do NOT remove or override `:focus-visible` styles (`outline: none` without an equivalent ring is forbidden).
+- Do NOT call Supabase, Notion or Redis from the browser.
+- Do NOT rely on hidden UI for authorization.
+- Do NOT disable lint rules, a11y checks or tests, and do NOT skip tests to make CI pass.
+
+## Verification before saying a task is done
+1. `npm run lint`, `npm run typecheck` and `npm run build` pass with zero errors.
+2. axe reports zero violations on every screen touched (all states and both themes).
+3. A screenshot of the implemented screen is compared against its Figma frame
+   (390, 768 and 1280 px) and any deviation is fixed or flagged for design approval.
+4. No hardcoded hex/px, no `any`, types come from `@quantia/contracts`.
+5. Role check: each role sees only its navigation and views; 401/403 handled.
+
+## Documentation map — read the right file (do not invent paths)
+
+| File | Role | When to read |
+| --- | --- | --- |
+| `.cursorrules` | Locked stack, invariants, DON'Ts | Always (this file) |
+| `AGENTS.md` | Agent workflow, repo map, commands, DoD | Always before acting |
+| `DESIGN.md` | Tokens, registered components, patterns | Before ANY UI work |
+| `.cursor/docs/SCREENS.md` | Screen inventory, routes, roles, blueprints | Any screen / route task |
+| `.cursor/docs/frontend-conventions.md` | Folders, Figma→code, Git/PR, DoD, env | Structure, PR, setup |
+| `.cursor/rules/ui-design-system.mdc` | Thin UI rule → points to `DESIGN.md` | `src/components/**`, `src/theme/**`, `*.styles.ts` |
+| `.cursor/rules/accessibility-ux.mdc` | A11y, copy, formats, focus, charts | `src/app/**`, `src/components/**` |
+| `.cursor/rules/api-integration.mdc` | Contracts, client, session, sockets, roles | `src/lib/**`, `src/features/**`, `src/app/**` |
+
+Load only the modular rule(s) that match the area you touch. Paths above are canonical —
+never use `docs/SCREENS.md`, `docs/frontend-conventions.md`, or bare `ui-design-system.md`.

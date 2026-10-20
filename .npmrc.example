@@ -1,0 +1,7 @@
+# Renombrar a .npmrc (se versiona: solo referencia la variable, nunca el token).
+# Exporta QUANTIA_NPM_TOKEN en tu shell y configúrala en Vercel/CI.
+# Reemplaza <REGISTRY_URL> por la URL del registro privado donde se publica @quantia/contracts
+# (ej. https://npm.pkg.github.com para GitHub Packages).
+@quantia:registry=<REGISTRY_URL>
+//<REGISTRY_HOST>/:_authToken=${QUANTIA_NPM_TOKEN}
+engine-strict=true

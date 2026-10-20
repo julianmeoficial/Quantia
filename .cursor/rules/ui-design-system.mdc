@@ -1,0 +1,37 @@
+---
+description: Quantia UI/design-system rule. Apply before any visual work. Source of truth is DESIGN.md (tokens, registered components, patterns). Do not invent components or hardcode hex/px.
+globs: src/components/**, src/theme/**, **/*.styles.ts, DESIGN.md
+alwaysApply: false
+---
+
+# UI & Design System — Quantia Web
+
+## Authority (read first)
+
+1. **`DESIGN.md`** (repo root) — tokens, registered components, layout patterns, DON'Ts. **Read before ANY UI work.**
+2. **`.cursor/docs/SCREENS.md`** — screen inventory, routes, roles, composition blueprints.
+3. **`.cursorrules`** — locked stack (Styled Components + Radix, no Tailwind/Shadcn CLI).
+
+If a token or component is not in `DESIGN.md`, stop and flag it. Do not invent parallel families.
+
+## Stack reminder
+
+- Radix primitive + Styled Components + theme tokens only.
+- Shadcn is a composition reference only — never copy Tailwind classes or run the Shadcn CLI.
+- Components live in `src/components/{base,system,composite,page}` and must match Figma/`DESIGN.md` names (`intent`, `size`, `isLoading`).
+
+## Mandatory while building UI
+
+- Map every color, space, radius, type and shadow to a theme token.
+- Implement technical → visual states: skeleton, empty, error, 401, 403, 429, sync, socket disconnected.
+- Dark mode via tokens only; honor `prefers-reduced-motion`; motion 150/200/250 ms on `transform`/`opacity`.
+
+## Related docs
+
+| File | When |
+| --- | --- |
+| `DESIGN.md` | Always for UI |
+| `.cursor/docs/SCREENS.md` | Any screen / route |
+| `.cursor/rules/accessibility-ux.mdc` | Routes and components (a11y, copy, formats) |
+| `.cursor/rules/api-integration.mdc` | Data, session, sockets, roles |
+| `.cursor/docs/frontend-conventions.md` | Folders, PR, DoD, env |

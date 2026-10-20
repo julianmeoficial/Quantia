@@ -1,0 +1,539 @@
+---
+name: api-integration
+description: Quantia frontend ↔ API integration. Apply to any code that calls the API, opens sockets, handles the session, renders server data or decides what a role can see. Enforces contracts, the single HTTP client, session/refresh, state map tied to the Design System, real-time events and their visual response, Chat General, role-based UI, URL pagination and client security.
+globs: src/lib/**, src/features/**, src/app/**
+alwaysApply: false
+---
+
+# Frontend ↔ Quantia API
+
+## 0. Context
+
+Quantia manages research projects of the INNOVATEK'S / GITEMOS seedbed. This frontend (Next.js on Vercel)
+consumes a closed and hardened NestJS API on Railway (F0–F7, S1–S6, P0–P6, Chat General, tech-debt backlog).
+
+- The API is the ONLY component that talks to Postgres (Supabase), Redis, Notion and Supabase Storage.
+  The frontend NEVER uses the Supabase SDK, the Notion API or Redis.
+- Postgres is the system of record. Notion is a capture layer synced in the background (hence `syncStatus`).
+- Budget lives ONLY in Postgres (never in Notion).
+- Slow work (Notion sync, PDF, Excel) runs in a BullMQ worker: the UI shows asynchronous states.
+- Real time: one Socket.io gateway with namespaces `/projects`, `/notifications` and `/general`.
+
+Sources of truth, in this order:
+1. `@quantia/contracts` v0.7.0: TS types + Zod schemas (enums, requests, responses, event payloads, exposed headers).
+2. `openapi/openapi.json` in the API repo. Swagger UI (`/api/docs`) exists ONLY locally; staging and production do
+   not expose it. Paths in the exported JSON do not include the `/api/v1` prefix.
+3. Design System page (DS): decides HOW states, events and roles are SHOWN. The DS endpoint and payload
+   inventories (§3.2, §3.3) are "proposed": when they differ from the contract, the contract wins.
+
+If it is not in the contract, it does NOT exist: request it from the backend (§12), never simulate it in the frontend.
+The UI may be STRICTER than the API (hide what the DS hides), never looser.
+
+## 1. Environments and configuration
+
+- `NEXT_PUBLIC_API_URL`: API origin WITHOUT suffix (e.g. `https://quantiaapi-production.up.railway.app`).
+- `src/lib/config.ts` is the only file that reads `process.env` and derives:
+  - `apiBaseUrl = ${NEXT_PUBLIC_API_URL}/api/v1` (REST)
+  - `socketUrl = ${NEXT_PUBLIC_API_URL}` + namespace (`RealtimeNamespace` from contracts)
+- CORS (allowlist, `credentials: true`):
+  - Production: only the production domain. Staging: also `https://*.vercel.app` (Vercel previews).
+  - A non-allowed origin fails in the browser with no readable response: it is not a client bug.
+- The ONLY readable response header is `Retry-After` (`HttpHeader.RETRY_AFTER` / `CORS_EXPOSED_HEADERS`).
+- Healthcheck: `GET /api/v1/health` (public, Terminus `{ status: 'ok', info: { database, redis } }`).
+  Use it only for a status page or a «Servicio no disponible» banner, never on every load.
+
+## 2. Single typed HTTP client (`src/lib/api`)
+
+- NO loose `fetch`/`axios` in components, UI hooks or server actions. Everything goes through `src/lib/api`.
+- Layers (imports flow app → features → components; components never import `lib/api`):
+  - `src/lib/api/client.ts`: base request (Bearer, JSON, single-flight refresh, error normalization, `Retry-After`).
+  - `src/lib/api/errors.ts`: `class ApiError { statusCode; message; path; timestamp; retryAfterSeconds?: number }`.
+  - `src/lib/api/{auth,users,projects,tasks,progress,documents,budget,reports,chat-general}.ts`: one function per endpoint.
+  - `src/lib/api/query-keys.ts`: cache keys per domain (`['projects', params]`, `['tasks', projectId, params]`…).
+  - `src/features/<domain>/hooks`: the only place that wraps endpoint functions with the query cache.
+  - `src/features/<domain>/services`: optional composition of several endpoint functions; never calls `client.ts`.
+- Request, response and query types ALWAYS come from `@quantia/contracts`. Never redeclare interfaces.
+- In development, validate responses with the contract Zod schema to detect drift.
+- Forms validate with the contract schema (`createTaskRequestSchema`, etc.) through the DS form components.
+- The API uses `whitelist + forbidNonWhitelisted`: an extra field in body or query → 400.
+  Never send properties outside the contract (no `id`, `createdAt`, `syncStatus`).
+- Body limits: JSON ≤ 1 MB and depth ≤ 10 (more → 400 "JSON body exceeds maximum depth").
+
+### Data types and formats
+
+| Data | Wire format | Display (always via `src/lib/format`) |
+| --- | --- | --- |
+| IDs | UUID v4 string | never shown to users |
+| Date-time | ISO 8601 UTC (`2026-10-09T17:00:00.000Z`) | `formatDate(v, { withTime: true })` → `09/10/2026 12:00`, America/Bogota |
+| Date-only (`dueDate`, `startDate`, `endDate`) | ISO built from America/Bogota 00:00 via `toApiDate()` | `formatDate(v)` → `DD/MM/AAAA` |
+| Money | decimal string `^\d+(\.\d{1,2})?$` (`"1500000.00"`) | `formatCOP(v)` → `$ 1.500.000` |
+| Percent | number 0–100 (`executedPercent`, `alertThresholdPercent`) | `formatPercent(v)` → `45,6 %` |
+| Nullable | arrives as `null`, never omitted | DS empty value «Sin definir» |
+
+- Money is NEVER converted to `number` to send or to add. `formatCOP` accepts the decimal string; it may parse only to
+  display. Default currency: `COP`.
+- Never `new Date('YYYY-MM-DD')` for date-only fields (parses as UTC and shows the previous day in Bogotá).
+- No `Intl.*`, `toLocaleString` or ad-hoc formatting outside `src/lib/format`.
+
+### Normalized error (every 4xx/5xx)
+
+~~~json
+{ "statusCode": 403, "message": "No access to this project", "path": "/api/v1/projects/…", "timestamp": "2026-10-09T17:00:00.000Z" }
+~~~
+
+- `message` is a string (multiple validation errors arrive joined). It is for logs or secondary detail; the UI ALWAYS
+  decides by `statusCode` and shows DS copy (§5), never raw `message` in English.
+- Never show `path`. 5xx have no technical details and the UI does not invent them.
+- On 429 the client reads `response.headers.get('Retry-After')` (integer seconds) into `ApiError.retryAfterSeconds`.
+
+### Pagination (every list except chat)
+
+~~~ts
+// Query: page (default 1), pageSize (default 20, REAL MAX 50), sortOrder 'asc' | 'desc' (default 'desc')
+type Paginated<T> = { data: T[]; meta: { page: number; pageSize: number; total: number; totalPages: number } };
+~~~
+
+- The API rejects `pageSize > 50` with 400. Contract `list*QuerySchema` still allow 100 (known debt): the frontend
+  ALWAYS clamps to 50 (`Math.min(pageSize, 50)`). Never try to "fetch everything".
+
+### Mutations and cache
+
+- Optimistic updates ONLY for task status/priority/assignee (DS: "optimista controlado") and chat messages (§6).
+  On error: revert, keep the user's input and show `Toast` error. Everything else is pessimistic with `Button loading`.
+- Destructive actions (delete project, task, progress, document, user, member) require `ConfirmDialog`.
+- Invalidation after mutations and events:
+
+| Trigger | Invalidate |
+| --- | --- |
+| task create/update/delete, `tarea.actualizada` | `['tasks', projectId]`, task detail, `['my-tasks']` |
+| progress create/update/delete, `avance.registrado` | `['progress', projectId]` |
+| project update, members change, `proyecto.retrasado` | `['projects']`, project detail |
+| budget create/update, execution created, `presupuesto.ejecucion-baja` | `['budget', projectId]`, `['budget-executions', projectId]` |
+| document upload/delete | `['documents', projectId]` |
+| logout | the whole cache |
+
+## 3. Endpoint reference
+
+Conventions:
+- Paths are relative to `/api/v1`. All require `Authorization: Bearer <accessToken>` except those marked PUBLIC.
+- Common errors on any authenticated route: 401, 403 (role or membership), 404, 400 (validation or invalid UUID in
+  path), 429, 500.
+- "Project access" = ADMIN, the project coordinator or a member. "Project manager" = ADMIN or THE project coordinator.
+- Non-existent project id → 404. Existing project without access → 403.
+
+### 3.1 Auth (dedicated rate limit: 10 req/min per client)
+
+**POST /auth/login** — PUBLIC
+- Body `LoginRequest`: `{ email: string(email), password: string(min 8) }`
+- 200 `AuthTokensResponse`: `{ accessToken, refreshToken, tokenType: 'Bearer', expiresIn }` (seconds, ≈ 900)
+- 401 "Invalid credentials" (same for unknown or inactive users): one generic copy «Correo o contraseña incorrectos».
+- 429 progressive lockout per email+IP: 5 failures → 60 s, 10 → 5 min, 20 → 15 min (15-min window), with
+  `Retry-After`: «Demasiados intentos. Vuelve a intentarlo en Xs» with countdown; submit disabled until 0.
+
+**POST /auth/refresh** — PUBLIC
+- Body `{ refreshToken }` → 200 with a NEW refresh; the previous one is revoked (rotation).
+- 401 "Invalid refresh token" · "Refresh token expired" · "User inactive" · "Refresh token reuse detected".
+- Reuse revokes the WHOLE token family (logs out every device of that family).
+- Two concurrent refreshes with the same token: one wins, the other gets 401 → refresh is single-flight (§4).
+
+**POST /auth/logout** — PUBLIC — Body `{ refreshToken }` → 204 (idempotent).
+
+### 3.2 Users
+
+**GET /users/me** — any role → `UserResponse { id, email, fullName, isActive, roles: RoleName[], createdAt, updatedAt }`.
+Source of truth for the current role and id. Never decode the JWT to read roles.
+
+**GET /users/directory** — ADMINISTRADOR and COORDINADOR (INVESTIGADOR → 403)
+- Used by the project member picker and the coordinator picker (admin).
+- Query: `q` (REQUIRED, 2–100 chars after trim, matches `fullName` or `email`, case-insensitive), `page`,
+  `pageSize` (≤ 50). No other params.
+- 200 `{ data: UserDirectoryEntry[], meta }`, `UserDirectoryEntry = { id, fullName, email }`. Only ACTIVE users,
+  ordered by `fullName`. No roles, status or dates: never infer a role from here.
+- 400 when `q` is missing or < 2 chars, `pageSize > 50` or unknown params.
+- UI: DS `SearchField` combobox, debounce ~300 ms, no call before 2 chars («Escribe al menos 2 caracteres»),
+  `EmptyState` «Sin coincidencias», mark users already in `project.memberIds`.
+
+ADMINISTRADOR only (others → 403):
+- **GET /users?page&pageSize&sortOrder** → `PaginatedUsersResponse` (no search or role filters; search uses the directory).
+- **GET /users/:id** → `UserResponse` or 404.
+- **POST /users** — `{ email, password(min 8), fullName(1–200), roles: RoleName[] (min 1), isActive? }` → 201 or
+  409 "Email already registered".
+- **PATCH /users/:id** — partial, same rules → 200, 404, 409.
+- **DELETE /users/:id** → 204 or 404. Hard delete: prefer «Desactivar» (`PATCH isActive=false`); deleting needs a
+  strong `ConfirmDialog` (type the name).
+
+### 3.3 Projects
+
+`ProjectResponse`: `{ id, title, description, objectives, status, startDate, endDate, coordinatorId, createdById,<br>memberIds: uuid[], syncStatus, createdAt, updatedAt }` (`description`, `objectives`, `startDate`, `endDate` nullable).
+`ProjectStatus`: `FORMULATION · ACTIVE · DELAYED · COMPLETED · CANCELLED`.
+
+- **GET /projects** — any role; returns ONLY accessible projects (ADMIN all; COORDINADOR coordinated + member;
+  INVESTIGADOR member). Query: `page, pageSize, status?, q? (title), sortBy: createdAt|title|status, sortOrder`.
+- **GET /projects/:id** → `ProjectResponse`, 403 or 404.
+- **POST /projects** — ADMINISTRADOR, COORDINADOR. Body: `{ title(1–300), description?(≤5000), objectives?(≤5000),<br>  status?, startDate?, endDate?, coordinatorId?, memberIds? }`.
+  - A coordinator is always the coordinator (another `coordinatorId` → 403). An ADMIN may assign any coordinator;
+    if omitted, the admin is the coordinator. Pickers use `GET /users/directory`.
+  - 201 with `syncStatus: PENDING`, or 404 "Coordinator not found" / "Member user not found: …".
+- **PATCH /projects/:id** — project manager. Partial body; `null` clears `startDate`/`endDate`.
+  `memberIds` REPLACES the whole list: for single changes use the member endpoints. A coordinator cannot reassign
+  the coordinator → 403. Status `DELAYED` emits `proyecto.retrasado`.
+- **DELETE /projects/:id** — manager → 204 (hard delete; `ConfirmDialog`).
+- **POST /projects/:id/members** — manager — `{ userId }` → 201, 404 "User not found", 409 "User is already a project member".
+- **DELETE /projects/:id/members/:userId** — manager → 204 or 404 "Project member not found".
+
+### 3.4 Tasks — `/projects/:projectId/tasks`
+
+`TaskResponse`: `{ id, projectId, title, description, assigneeId, status, priority, dueDate, syncStatus, createdAt,<br>updatedAt }`. `TaskStatus`: `TODO · IN_PROGRESS · BLOCKED · DONE`. `TaskPriority`: `LOW · MEDIUM · HIGH`.
+The DS inventory says `PATCH /api/v1/tasks/:id`: the real path is nested (contract wins).
+
+- **GET** — project access. Query: `page, pageSize, status?, priority?, assigneeId?, sortBy: dueDate|priority|createdAt, sortOrder`.
+- **GET /:taskId** → `TaskResponse` or 404.
+- **POST** — project access (UI restricts it, §7). Body `{ title(1–300), description?(≤5000), assigneeId?, status?,<br>  priority?, dueDate? }`. `assigneeId` must be a member or the coordinator (else 403 "Assignee must be a project
+  member"): the assignee picker offers ONLY `memberIds` + `coordinatorId` (never the directory).
+  201 + `tarea.actualizada` + Notion sync (`PENDING`).
+- **PATCH /:taskId** — assignee or manager → 200, 403, 404 (optimistic, §2).
+- **DELETE /:taskId** — assignee or manager → 204, 403, 404.
+
+### 3.5 Progress — `/projects/:projectId/progress`
+
+`ProgressResponse`: `{ id, projectId, taskId, authorId, title, description, evidenceLinks: string[], recordedAt,<br>syncStatus, createdAt, updatedAt }` (`taskId` nullable).
+
+- **GET** — Query: `page, pageSize, taskId?, authorId?, sortBy: recordedAt|createdAt, sortOrder`.
+- **GET /:progressId** → `ProgressResponse` or 404.
+- **POST** — project access. Body `{ title(1–300), description(1–10000), taskId?, evidenceLinks?: url[] (max 20),<br>  recordedAt? }`. `taskId` from another project → 400 "Task does not belong to this project".
+  201 + `avance.registrado` + Notion sync. DS states: «Guardado» → `SyncStatus` pending → synced or failed.
+- **PATCH / DELETE /:progressId** — author or manager → 200/204, 403, 404.
+
+### 3.6 Documents — `/projects/:projectId/documents`
+
+`DocumentResponse`: `{ id, projectId, uploadedById, originalName, mimeType, sizeBytes, status, createdAt }`.
+`DocumentStatus`: `UPLOADED · SCANNED · QUARANTINED`.
+
+- **POST** — project access — `multipart/form-data` with field `file` (exactly that name).
+  - Allowed (real content is checked, not the extension): PDF, PNG, JPEG, XLSX. Max 25 MB (26 214 400 bytes) → 413.
+  - Validate type and size in `FileUploader` BEFORE uploading; still handle 400 and 413. No file → 400 "File is required".
+  - Never set `Content-Type` manually (the browser adds the `FormData` boundary).
+  - Upload progress (DS "progreso de carga") uses `XMLHttpRequest.upload.onprogress` INSIDE `src/lib/api/documents.ts`
+    (the only allowed non-`fetch` transport).
+- **GET** — `page, pageSize, sortOrder`.
+- **GET /:documentId/download** → `{ documentId, url, expiresInSeconds }` (≈ 300 s). Request it on click and open it
+  immediately. NEVER store, cache, put in a static `href` or share it.
+- **DELETE /:documentId** — manager → 204.
+
+### 3.7 Budget — `/projects/:projectId/budget` (Postgres only, no `syncStatus`)
+
+`BudgetResponse`: `{ id, projectId, totalAmount, currency, alertThresholdPercent, executedAmount, executedPercent,<br>items: BudgetItem[], createdAt, updatedAt }`. `BudgetItem`: `{ id, category, plannedAmount, notes }`.
+`BudgetExecution`: `{ id, itemId, kind, amount, occurredAt, registeredById, note, createdAt }`.
+`BudgetExecutionKind`: `COMMITMENT · PAYMENT · ADJUSTMENT`.
+
+- **GET** — project access (UI shows it only if `canViewBudgetDetail`, §7).
+  404 "Budget not found" = no budget YET → `EmptyState` «Sin presupuesto» (CTA «Crear presupuesto» only for
+  `canManageBudget`). NOT an error screen.
+- **POST** — ADMIN/COORDINADOR + manager. `{ totalAmount, currency? (default COP), alertThresholdPercent? (0–100,<br>  default 80), items?: { category(1–200), plannedAmount, notes?(≤2000) }[] (max 100) }` → 201 or 409 "Budget already exists".
+- **PATCH** — same permission. `items`, if sent, REPLACES all items → 200 or 404.
+- **POST /executions** — same permission. `{ itemId?, kind, amount, occurredAt?, note?(≤2000) }` → 201 or 404
+  "Budget item not found". If `executedPercent < alertThresholdPercent` the API emits `presupuesto.ejecucion-baja`
+  to the project room and to the coordinator's `/notifications`.
+- **GET /executions** — `page, pageSize, sortOrder`.
+- Rendered with DS `BudgetPanel` + `DataTable`; amounts with `formatCOP`, percentages with `formatPercent`.
+
+### 3.8 Reports — `/projects/:projectId/reports` (dedicated limit: 5 POST/min)
+
+- **POST** — project access. `{ kind: 'BUDGET_PDF' | 'BUDGET_EXCEL' | 'PROGRESS_PDF' }` → 201
+  `{ reportId, status: 'QUEUED' }` or 429 with `Retry-After`. UI offers `BUDGET_*` only if `canViewBudgetDetail`.
+- **GET /:reportId** → `{ id, projectId, requestedById, kind, status, errorMessage, downloadUrl, expiresInSeconds,<br>  createdAt, updatedAt }`. `ReportStatus`: `QUEUED → PROCESSING → READY · FAILED` (worker retries 3× with backoff).
+- No list endpoint and no `reporte.completado` event in the contract: follow-up is polling (§5).
+
+### 3.9 Chat General — `/chat/general` (can be disabled by config)
+
+`GeneralChatMessage`: `{ id, content, clientMessageId, createdAt, author: { id, name, avatarUrl } }`
+(`clientMessageId`, `avatarUrl` nullable).
+
+- **GET /messages?cursor&limit** → `{ items, nextCursor, hasMore }`. `limit` default 30, max 100. Order: NEWEST
+  FIRST, stable by `createdAt + id`; the UI reverses it to paint. Older pages: `cursor = nextCursor` while `hasMore`.
+  Invalid cursor → 400. Merge pages and live events deduplicated by `id`.
+- **POST /messages** — `{ content (trim, 1–2000 by config; 4000 absolute contract cap), clientMessageId? (1–64, UUID<br>  generated by the client) }` → 201 `{ message }` if created; 200 `{ message }` if that `clientMessageId` already
+  existed (idempotent retry). The message is confirmed ONLY after the API persists it.
+- Rate limit 20 messages/min per user → 429 with `Retry-After`: disable the composer and show the countdown.
+- Disabled → REST 404 "Chat General is not enabled" and immediate socket disconnect: hide the whole section.
+
+### 3.10 Rate limits
+
+| Limiter | Scope | Default limit | 429 |
+| --- | --- | --- | --- |
+| `default` | all routes | 120 req/min | `Retry-After` |
+| `auth` | `/auth/*` | 10 req/min | `Retry-After` |
+| login lockout | email + IP | 5/10/20 failures → 60 s/5 min/15 min | `Retry-After` (remaining) |
+| `reports` | `POST /reports` | 5 req/min | `Retry-After` |
+| `chat-general` | `POST /chat/general/messages` | 20 req/min per user | `Retry-After` |
+
+`/health` has no limit. Every 429 carries `Retry-After` in integer seconds, readable through CORS.
+
+## 4. Authentication and session
+
+- Access JWT: 15 min. Refresh: 7 days, rotating, revocable, with reuse detection.
+- `accessToken` → ONLY in memory (auth store). Never in `localStorage`/`sessionStorage`/readable cookies.
+  On reload it is recovered through refresh.
+- `refreshToken` → `httpOnly; Secure; SameSite=Strict; Path=/api/session` cookie set by minimal Next route handlers
+  (`src/app/api/session/{login,refresh,logout}/route.ts`) that forward to the API and NEVER return the refresh to
+  browser JS (only `accessToken` and `expiresIn`). Reason: the API returns the refresh in the body, and a 7-day token
+  readable by JS is the most valuable asset under XSS.
+- Those handlers are the only exception to direct access and belong to the session transport of `src/lib/api`. They:
+  forward the API status and `Retry-After` as is (login 429 needs it), reject requests whose `Origin` is not the app
+  origin (CSRF), and respond with `Cache-Control: no-store`.
+- Boot: `session/refresh` → 200: `GET /users/me` → hydrate role → redirect to the role landing (§8); 401 → `/login`.
+  While booting, the shell shows `Skeleton` of `RoleSidebar` + `AppHeader` (DS "skeleton de navegación").
+- Refresh: proactive ~60 s before `expiresIn`; reactive on any 401 (except auth routes) with ONE refresh in flight
+  (single-flight), concurrent requests wait and retry ONCE. Refresh fails → session-expired modal (§5). Never loop.
+- Tabs: `BroadcastChannel('quantia-auth')` so only one tab rotates the refresh and the others receive the new access
+  token (otherwise reuse detection would close the session).
+- After every refresh: revalidate `/users/me` (deactivated user or changed roles) and update `socket.auth.token`.
+- Logout: `session/logout` → API revokes → clear cookie, store and query cache, disconnect ALL sockets, clear session
+  drafts and pending report ids, notify other tabs.
+
+## 5. Mandatory state map (DS §4.5)
+
+Every screen or component that consumes data renders these states with REGISTERED DS components only
+(`EmptyState`, `Skeleton`, `ErrorState`, `ConfirmDialog`, `Toast`, `SyncStatus`, `ConnectionStatus`).
+No generic spinner, no blank screen.
+
+| Situation | DS component | Copy (es-CO) and behaviour |
+| --- | --- | --- |
+| First load | `Skeleton` shaped like the final content | does not block global navigation |
+| Refetch with data | keep data + subtle indicator | never back to `Skeleton` |
+| Empty list (`meta.total === 0`, no filters) | `EmptyState` | specific message + next action; CTA only if the role can create |
+| Empty by filters/search | `EmptyState` | «Sin resultados» + «Limpiar filtros» |
+| Budget 404 | `EmptyState` | «Sin presupuesto» (+ CTA for managers) |
+| Directory `q` < 2 chars | field help text | «Escribe al menos 2 caracteres» (no API call) |
+| 400 | inline field errors | message next to the field; never only a toast |
+| 401 after refresh fails | session-expired dialog | «Tu sesión expiró» without unmounting the screen; keep the form draft (sessionStorage, NO tokens) and retry the action after re-login |
+| 403 | `ErrorState` forbidden | «No tienes permiso» + «Volver a [landing]»; never reveal whether the resource exists; no silent redirect |
+| 404 | `ErrorState` not-found | «No encontrado» + back action |
+| 409 | inline or `Toast` | concrete conflict (email duplicado, ya es miembro, presupuesto existente) + refetch |
+| 413 | `FileUploader` error | «El archivo supera 25 MB» |
+| 429 | `ErrorState` rate-limit (inline in forms) | «Estamos procesando demasiadas solicitudes. Reintentando en Xs» with visible countdown from `Retry-After`; source action disabled |
+| 5xx / offline | `ErrorState` server | recoverable error + «Reintentar», no technical details |
+| WebSocket down | `ConnectionStatus` | «Datos posiblemente desactualizados» + auto reconnect + «Reconectar» (F-04) |
+
+429 rules:
+- Never retry before `Retry-After` expires. At most ONE automatic retry after the wait (DS "reintento automático con
+  espera visible"); after that, manual only. Missing header (proxy): local fallback 5 s → 10 s → 30 s.
+- Countdown text updates visually every second but is announced only at start and end (polite live region).
+- `RateLimitNotice` is NOT in the DS inventory: implement it as `ErrorState variant="rate-limit"` fed by
+  `ApiError.retryAfterSeconds` until it is registered in Figma and the DS.
+
+### Notion sync — `SyncStatus`
+
+Applies to projects, tasks and progress (`syncStatus: PENDING · SYNCED · FAILED`):
+- `PENDING` → badge «Sincronizando con Notion»; the user keeps working.
+- `FAILED` → banner «No se pudo sincronizar con Notion». The Quantia data IS valid: never block reading or editing.
+  Only ADMINISTRADOR sees «Reintentar» (F-05), and only when the retry endpoint exists (§12).
+- `SYNCED` → no indicator (or a discreet check).
+- Scope (DS): Investigador sees the state of his own data, Coordinador of his portfolio, Admin everything.
+- `syncStatus` is NOT in socket payloads: after an event, refetch the resource.
+- Budget, documents, reports, directory and chat have no `syncStatus`.
+
+### Async jobs — reports («Generando reporte»)
+
+1. `POST /reports` → store `{ reportId, kind, projectId }` in a GLOBAL reports store (in memory + sessionStorage,
+   no URLs) so polling survives navigation (DS: "continuar navegando y recibir notificación").
+2. Poll `GET /reports/:reportId` with backoff 2 s → 4 s → 8 s (cap 30 s; stop after ~5 min → «Revisar más tarde»).
+3. `READY` → `Toast` «Reporte listo» with action «Descargar» (`downloadUrl`; if `expiresInSeconds` passed, GET again).
+4. `FAILED` → «No se pudo generar el reporte» + «Reintentar» (new POST). Never show raw `errorMessage`.
+5. Disable «Generar» while a report of the same `kind` is running in that project, or while a `Retry-After` runs.
+
+### Documents — status
+
+- `UPLOADED` → «En revisión» (no download until `SCANNED`). `SCANNED` → downloadable.
+- `QUARANTINED` → «Bloqueado por seguridad», no download action.
+
+## 6. Real time (Socket.io)
+
+- A single provider in `src/lib/socket/` (`client.ts`, `events.ts`, `provider.tsx`) owns every socket.
+  NO sockets in components; components subscribe through hooks.
+- Server limits: 5 simultaneous connections per user (ALL tabs and namespaces), 30 events/s per socket, 60 s idle
+  (covered by Socket.io ping/pong). Exceeding → `error { message: 'Too many connections' }` + disconnect.
+- Connection budget (one tab with all three namespaces already uses 3 of 5):
+  - `/notifications`: while signed in.
+  - `/projects`: only while a project view is mounted.
+  - `/general`: only while the Chat General view is mounted.
+  - "Too many connections" → no reconnect loop; `ConnectionStatus` «Tiempo real pausado en esta pestaña» and the
+    view keeps working with REST (refetch on focus).
+- Connect: `io(socketUrl + ns, { auth: { token: accessToken }, transports: ['websocket'] })`. Never put the token
+  in the query string.
+- Token rejected → server disconnects silently: refresh once and reconnect with the new token; if it fails → session
+  expired. After every refresh update `socket.auth.token` (used on the next reconnect).
+- ALWAYS use `RealtimeNamespace`, `RealtimeEvent` and `ChatGeneralEvent` from `@quantia/contracts`.
+- Validate every payload with its Zod schema (`tareaActualizadaPayloadSchema.safeParse`…); drop invalid ones.
+- Events INVALIDATE or patch the cache; they are not the source of truth. After reconnect → refetch the active view.
+- Disconnect → `ConnectionStatus` «Datos posiblemente desactualizados» (no blocking), Socket.io auto-reconnect with
+  backoff and a manual «Reconectar» button; on reconnect hide the banner, re-join and refetch.
+- No listening to or emitting events outside the contract.
+
+### `/projects`
+
+- On connect the server emits `authenticated { userId }`.
+- Client → `join { projectId }` with ack `{ ok: true, room }` or `{ ok: false, error }`. The server checks
+  membership. Join when entering a project view and again after every reconnect. `ok: false` → do not retry; REST keeps working.
+- There is no `leave`: ignore events whose `payload.projectId` is not the active project.
+
+### Event → cache → visual response (DS §3.2, §4.5, D-07)
+
+| Event (contract payload) | Cache | Visual response | Who sees it |
+| --- | --- | --- | --- |
+| `tarea.actualizada` `{ projectId, taskId, title, status, priority, assigneeId, updatedAt }` | patch the cached row, refetch detail (sync state) | update the `TaskRow` IN PLACE + 1–2 s highlight; never reorder under the cursor or focus | project view members |
+| `avance.registrado` `{ projectId, progressId, taskId, title, authorId, recordedAt, updatedAt }` | invalidate progress | insert into `ActivityTimeline` without moving focus; if scrolled, pill «N avances nuevos» | project view members |
+| `proyecto.retrasado` `{ projectId, title, status: 'DELAYED', endDate, updatedAt }` | invalidate project | status `Badge` «Retrasado» for everyone; persistent `AlertList` item only if `canManageProject` | badge: all; alert: managers |
+| `presupuesto.ejecucion-baja` `{ projectId, budgetId, executedPercent, thresholdPercent, updatedAt }` | invalidate budget | alert card «Ejecución baja: 45,6 % de 80 %» + «Ver presupuesto» | only `canViewBudgetDetail` |
+
+- D-07: when a patch would change the order of a sorted list, keep the visible order and show «Lista actualizada ·
+  Reordenar»; the new order applies on user action, page or filter change.
+- Highlights respect `prefers-reduced-motion` (static outline instead of animation).
+- Announce through the single polite live region (accessibility-ux), max one announcement per burst.
+- The DS proposes extra payload fields (`dueDate`, `summary`, `reason`, `severity`, `progressPercent`): they are not
+  in the contract; do not read them (§12).
+
+### `/notifications`
+
+- Automatic personal room (`user:<id>`), no join.
+- `presupuesto.ejecucion-baja` reaches the coordinator here AND through `/projects`: deduplicate by
+  `projectId + updatedAt` before showing anything.
+- No REST for notifications: they are ephemeral (`Toast` + in-memory notification center for the session).
+
+### `/general` (Chat General)
+
+- JWT required; after validation the server joins the socket to the fixed room `general` automatically (no `join`).
+- `chat.general.presencia { users: PresenceUser[], generatedAt }` → REPLACE the presence list (also after reconnect).
+- `chat.general.usuario-conectado { user, occurredAt }` / `chat.general.usuario-desconectado { userId, occurredAt }`
+  → upsert/remove in a `Map` keyed by `userId`. Several tabs of one user count as ONE presence and "disconnected" only
+  arrives when the last socket closes: never infer offline from your own tab closing.
+- `PresenceUser` exposes only `id`, `name`, `avatarUrl`: no emails or roles in the chat UI.
+- `chat.general.mensaje-creado { message }` → append if its `id` or `clientMessageId` is not already present.
+- Send ALWAYS via REST, never by socket. Optimistic message states:
+  - `sending` (generated `clientMessageId`, muted style) → `sent` on 201/200 or the matching `mensaje-creado`.
+  - `failed` → «No se envió · Reintentar»; retry with the SAME `clientMessageId` (the API answers 200, no duplicates).
+- Scroll: new messages do not move the view if the user scrolled up; show pill «Nuevos mensajes». Older history loads
+  at the top keeping the scroll anchor.
+- Message list `role="log"`; content rendered as plain text (`white-space: pre-wrap`), counter «X/2000», send
+  disabled when empty, sending or during 429.
+- Immediate disconnect on connect = chat disabled → hide the section and its navigation entry.
+
+## 7. Authorization in the UI
+
+The API decides (deny by default + object-level authorization). The UI only HIDES what does not apply (it may be
+stricter than the API, following the DS matrix) and ALWAYS handles 403 as the safety net.
+
+Required helpers in `src/lib/auth/permissions.ts`, computed from `/users/me` and the resource:
+
+| Helper | Rule |
+| --- | --- |
+| `primaryRole(me)` | highest privilege: ADMINISTRADOR > COORDINADOR > INVESTIGADOR |
+| `isAdmin(me)`, `isCoordinator(me)` | role check |
+| `canSearchUsers(me)` | admin or coordinator |
+| `canManageUsers(me)` | admin |
+| `canManageProject(me, project)` | admin or `project.coordinatorId === me.id` |
+| `canManageMembers(me, project)` | `canManageProject` (uses `/users/directory`) |
+| `canCreateTask(me, project)` | `canManageProject` (DS: Investigador does not create tasks; API allows it) |
+| `canEditTask(me, project, task)` | `canManageProject` or `task.assigneeId === me.id` |
+| `canCreateProgress(me, project)` | project access |
+| `canEditProgress(me, project, p)` | `canManageProject` or `p.authorId === me.id` |
+| `canDeleteDocument(me, project)` | `canManageProject` |
+| `canViewBudgetDetail(me)` | admin or coordinator (DS: Investigador «sin detalle financiero») |
+| `canManageBudget(me, project)` | (admin or coordinator) and `canManageProject` |
+| `canGenerateReport(me, kind)` | `PROGRESS_PDF`, or `BUDGET_*` if `canViewBudgetDetail` |
+| `canViewAudit(me)` | admin (coordinator only if approved; no endpoint yet) |
+| `canRetrySync(me)` | admin (no endpoint yet) |
+
+Never trust a `projectId` in local state to "grant" access: if the API answers 403/404, render that state.
+
+## 8. Navigation and landing by role (DS §2.2, D-06)
+
+Roles (`RoleName`): `INVESTIGADOR`, `COORDINADOR`, `ADMINISTRADOR`; several roles → `primaryRole`.
+
+| Module | INVESTIGADOR | COORDINADOR | ADMINISTRADOR |
+| --- | --- | --- | --- |
+| Landing | `/mis-tareas` «Mis tareas» | `/panel` group dashboard | `/institucional` institutional view |
+| Projects | where member (`/mis-proyectos/[projectId]`) | portfolio (`/cartera/[projectId]`): coordinated + member, tagged | all |
+| Create / edit / delete project | — | yes (he is the coordinator) / those he coordinates | yes (assigns coordinator) |
+| Members (directory) | — | projects he coordinates | yes |
+| Tasks | view and update assigned | create, assign, reassign, change date in portfolio | global |
+| Progress | create and view in his projects | view in portfolio (comments: §12) | view all |
+| Documents | view and upload; no delete | manage in portfolio | institutional |
+| Budget | hidden | view and manage in portfolio (create, edit, register executions) | view and manage detail |
+| Reports | `PROGRESS_PDF` of his projects | PDF/Excel of portfolio | PDF/Excel (institutional: §12) |
+| Users | own profile only | — | CRUD users and roles |
+| Audit | — | only if approved | full (§12) |
+| Sync | state of own data | state of portfolio | state + retry (§12) |
+| Chat General | yes (if enabled) | yes | yes |
+
+- Sections without permission are NOT rendered (not disabled, not greyed) and are absent from `RoleSidebar`.
+- Group `layout.tsx` `RoleGate`: a role without the view is redirected to its landing. UX only; the API is the authority.
+
+## 9. Pagination and filters in the URL (RF-19)
+
+- Every list uses `page` and `pageSize` (default 20, max 50) and renders `meta` with DS `Pagination`.
+- Filters, sort and page live in search params with the EXACT contract names (route segments are Spanish; query
+  params are not):
+  - Projects: `page, pageSize, status, q, sortBy(createdAt|title|status), sortOrder`
+  - Tasks: `page, pageSize, status, priority, assigneeId, sortBy(dueDate|priority|createdAt), sortOrder`
+  - Progress: `page, pageSize, taskId, authorId, sortBy(recordedAt|createdAt), sortOrder`
+  - Documents / executions / users: `page, pageSize, sortOrder`
+- The user directory lives in the combobox state, NOT in the URL. Chat General uses cursor + infinite scroll, not the URL.
+- Parse with the contract `list*QuerySchema` and clamp `pageSize` to 50; invalid values fall back to the default.
+  Never send empty or unknown params (400).
+- Changing a filter resets `page=1`. Searches (`q`) debounce ~300 ms. `page > totalPages` after a delete → last valid page.
+- Filter UI: DS `FilterBar` + `SearchField`; enum labels in Spanish come from one map per enum
+  in `statusPresentation.ts` (accessibility-ux §1, e.g. `TaskStatus.IN_PROGRESS` → «En curso»), never inline strings.
+
+## 10. Client security
+
+- No secrets in `NEXT_PUBLIC_*` except the API URL.
+- No tokens in `localStorage`, logs, analytics, URLs, error messages or session drafts.
+- Never render API HTML (`dangerouslySetInnerHTML` forbidden): chat, descriptions and progress are plain text.
+- `evidenceLinks`: show only `http(s)`, open with `target="_blank" rel="noopener noreferrer"`.
+- Signed URLs (documents, reports): ephemeral, never persisted.
+- Directory results and emails: not cached beyond the session, never sent to analytics.
+- Session route handlers: `Origin` check, `no-store`, never log bodies.
+
+## 11. Definition of Done per screen
+
+- [ ] Only `src/lib/api` functions through `features/<domain>/hooks`; zero `fetch` in components.
+- [ ] Types, enums and validation 100 % from `@quantia/contracts` v0.7.0; no extra fields in requests.
+- [ ] Renders the §5 map with registered DS components: `Skeleton`, `EmptyState`, 400 inline, 401 keeping the draft,
+      403, 404, 409, 429 with `Retry-After` countdown, 5xx and `ConnectionStatus`.
+- [ ] `SyncStatus` on projects, tasks and progress; «Generando reporte» persists across navigation; document status.
+- [ ] Sockets only via the provider, within the connection budget; contract events validated with Zod; dedupe;
+      re-join and refetch after reconnect.
+- [ ] Live updates patch in place with a 1–2 s highlight, no reordering under the cursor, polite announcement.
+- [ ] Navigation, landing and actions follow §7–§8; nothing disabled-but-visible.
+- [ ] Member/coordinator pickers use `GET /users/directory` (≥ 2 chars, debounce); task assignees only from
+      `memberIds` + `coordinatorId`.
+- [ ] Paginated lists (`pageSize` ≤ 50) with filters and sort in the URL.
+- [ ] Money as decimal string, dates ISO; all display through `formatCOP`, `formatDate`, `formatPercent`.
+- [ ] Chat: optimistic states with the same `clientMessageId` on retry, dedupe by `id`, scroll anchor, plain text.
+- [ ] No tokens outside memory / httpOnly cookie.
+
+## 12. Contract gaps (do NOT simulate)
+
+The DS requires these, but they are not in `@quantia/contracts` v0.7.0. Do not render the feature (or render the
+`EmptyState` agreed with design) and open a backend issue in Linear:
+
+| DS need | Missing in the contract | Until it exists |
+| --- | --- | --- |
+| Coordinator/admin KPIs (`GET /dashboard`) | dashboard endpoint | `/panel` and `/institucional` compose KPIs from `GET /projects` (status counts via `meta.total` per status filter) |
+| «Mis tareas» across projects | cross-project "my tasks" endpoint | `GET /projects` + `GET /projects/:id/tasks?assigneeId=me.id` per project, max 4 concurrent, `pageSize` 50 |
+| Sync retry (F-05) and `sync.failed` | `POST /sync/:entityType/:id/retry`, event | show `FAILED` without «Reintentar» |
+| `reporte.completado` | event | polling (§5); when added, it stops polling and fires the `Toast` |
+| Audit, convocatorias, institutional reports | endpoints | do not render the modules |
+| Comments on progress (Coordinador) | endpoint | read-only progress |
+| Event fields `dueDate`, `summary`, `reason`, `severity`, `progressPercent` | payload fields | refetch the resource |
+
+## 13. Related docs (canonical paths)
+
+- `.cursorrules` — product, locked stack, global invariants, documentation map.
+- `AGENTS.md` — repo map, commands, workflow.
+- `DESIGN.md` — tokens and registered components (before UI).
+- `.cursor/rules/ui-design-system.mdc` — UI rule globs → points to `DESIGN.md`.
+- `.cursor/rules/accessibility-ux.mdc` — live regions, focus, copy, formats.
+- `.cursor/docs/SCREENS.md` — screen inventory, routes, roles.
+- `.cursor/docs/frontend-conventions.md` — folder structure, env vars, PR and DoD.
