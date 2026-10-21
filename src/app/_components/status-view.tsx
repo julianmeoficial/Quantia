@@ -18,8 +18,8 @@ const Wrapper = styled(motion.section)`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: ${({ theme }) => theme.space[4]};
-  padding: ${({ theme }) => theme.space[6]};
+  gap: ${({ theme }) => theme.space[16]};
+  padding: ${({ theme }) => theme.space[24]};
   text-align: center;
 `;
 

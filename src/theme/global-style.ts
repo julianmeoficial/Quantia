@@ -2,10 +2,10 @@
 
 import { createGlobalStyle } from "styled-components";
 
-import { darkPalette, lightPalette, paletteToCssDeclarations } from "./index";
+import { colorsToCssDeclarations, darkColors, lightColors } from "./index";
 
-const lightVars = paletteToCssDeclarations(lightPalette);
-const darkVars = paletteToCssDeclarations(darkPalette);
+const lightVars = colorsToCssDeclarations(lightColors);
+const darkVars = colorsToCssDeclarations(darkColors);
 
 export const GlobalStyle = createGlobalStyle`
   :root {
@@ -44,7 +44,7 @@ export const GlobalStyle = createGlobalStyle`
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    background: ${({ theme }) => theme.colors.surface.canvas};
+    background: ${({ theme }) => theme.colors.bg.canvas};
     color: ${({ theme }) => theme.colors.text.primary};
     font-family: ${({ theme }) => theme.fonts.sans};
     font-size: ${({ theme }) => theme.typography.bodyMedium.fontSize};

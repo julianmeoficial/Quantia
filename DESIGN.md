@@ -40,48 +40,64 @@ A friendly character may appear in onboarding or an empty state, but is not requ
 
 Architecture: primitive values -> semantic aliases -> component tokens where useful.
 Raw values belong only in token definitions. Components consume semantic theme tokens, not copied hex values.
-Figma slash paths map to nested Styled Components theme keys: color/action/primary -> theme.colors.action.primary. Keep one canonical mapping per token.
+Figma slash paths map to nested Styled Components theme keys. Figma exports `action/*`; code exposes them as `theme.colors.brand.*` (DS-93). Status uses `error` (not `danger`). Keep one canonical mapping per token.
 
-### 4.1 Operational Colors
+**Governance (DS-93):** Figma variables → W3C JSON in `src/theme/figma/` → `npm run tokens:build` → `src/theme/{light,dark,scales}.ts`. A token changes in one place (Figma), then re-export and rebuild.
 
-| Semantic token          | Light               | Dark             | Purpose                      |
-| ----------------------- | ------------------- | ---------------- | ---------------------------- |
-| color/bg/canvas         | #F7F8FA             | #101419          | Application canvas           |
-| color/bg/surface        | #FFFFFF             | #181E25          | Panels, cards, tables        |
-| color/bg/subtle         | #F0F3F6             | #202832          | Grouping and table headers   |
-| color/text/primary      | #18202A             | #F2F5F8          | Main content                 |
-| color/text/secondary    | #56616F             | #B4BEC9          | Supporting content           |
-| color/border/subtle     | #D8DEE6             | #35404D          | Nonessential separators      |
-| color/border/control    | #7B8794             | #718096          | Necessary control boundaries |
-| color/brand/primary     | #315C8C             | #79A8D8          | Brand identity               |
-| color/action/primary    | #315C8C             | #79A8D8          | Primary action background    |
-| color/action/hover      | #274A70             | #91B9E2          | Primary action hover         |
-| color/action/pressed    | #203D5C             | #AAC9E9          | Primary action pressed       |
-| color/action/on-primary | #FFFFFF             | #101419          | Primary button label         |
-| color/selection/bg      | #EAF1F8             | #203348          | Selected navigation and rows |
-| color/selection/text    | #274A70             | #B8D5F2          | Selected content             |
-| color/focus/ring        | #315C8C             | #79A8D8          | Keyboard focus               |
-| color/disabled/bg       | #EEF1F4             | #26303A          | Disabled controls            |
-| color/disabled/text     | #657180             | #A4AFBB          | Disabled labels              |
-| color/overlay           | rgba(24,32,42,0.40) | rgba(0,0,0,0.60) | Modal backdrop               |
+### 4.0 Figma export inventory
+
+| Collection / file                               | Path in repo                                 | Role                                                       |
+| ----------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| Quantia · Semantic / Light                      | `src/theme/figma/semantic.light.tokens.json` | Canonical semantic colors (Light)                          |
+| Quantia · Semantic / Dark                       | `src/theme/figma/semantic.dark.tokens.json`  | Canonical semantic colors (Dark)                           |
+| Quantia · Primitives (Mode 1)                   | `src/theme/figma/primitives.tokens.json`     | Primitive hex + spacing, radius, layout, size, motion      |
+| Component Mode 1 (`button` / `field` / `table`) | Not in repo yet                              | Component tokens for later DS issues — see §4.5            |
+| Colección 1 Light/Dark                          | Not ingested                                 | WIP names (`text-same`, `bg-same`); superseded by Semantic |
+
+### 4.1 Operational Colors (from Quantia · Semantic)
+
+Theme API: `theme.colors.{bg,text,border,brand,selection,focus}`.
+
+| Semantic token (Figma) | Light   | Dark    | Theme key              | Purpose                      |
+| ---------------------- | ------- | ------- | ---------------------- | ---------------------------- |
+| bg/canvas              | #F7F8FA | #101419 | colors.bg.canvas       | Application canvas           |
+| bg/surface             | #FFFFFF | #181E25 | colors.bg.surface      | Panels, cards, tables        |
+| bg/subtle              | #F0F3F6 | #202832 | colors.bg.subtle       | Grouping and table headers   |
+| text/primary           | #18202A | #F2F5F8 | colors.text.primary    | Main content                 |
+| text/secondary         | #56616F | #B4BEC9 | colors.text.secondary  | Supporting content           |
+| border/subtle          | #D8DEE6 | #35404D | colors.border.subtle   | Nonessential separators      |
+| border/control         | #7B8794 | #718096 | colors.border.control  | Necessary control boundaries |
+| action/primary         | #315C8C | #79A8D8 | colors.brand.primary   | Brand / primary action       |
+| action/primary-hover   | #274A70 | #8DB7E0 | colors.brand.hover     | Primary action hover         |
+| action/primary-pressed | #203D5C | #6698CA | colors.brand.pressed   | Primary action pressed       |
+| action/on-primary      | #FFFFFF | #101419 | colors.brand.onPrimary | Primary button label         |
+| selection/bg           | #EAF1F8 | #203348 | colors.selection.bg    | Selected navigation and rows |
+| selection/text         | #274A70 | #B8D5F2 | colors.selection.text  | Selected content             |
+| focus/ring             | #315C8C | #79A8D8 | colors.focus.ring      | Keyboard focus               |
+
+Not yet in Semantic export (proposed only — do not invent in generated theme): `color/disabled/*`, `color/overlay`, separate `color/brand/*` distinct from `action/*`.
 
 Subtle borders are not automatically sufficient for accessible input boundaries. Use control borders when necessary. Never reduce an entire disabled form to unreadable opacity.
 
-### 4.2 Status Colors
+### 4.2 Status Colors (from Quantia · Semantic)
 
-| State   | Light foreground | Light background | Dark foreground | Dark background |
-| ------- | ---------------- | ---------------- | --------------- | --------------- |
-| Success | #247A4A          | #EDF7F0          | #65C78D         | #172E24         |
-| Warning | #92400E          | #FFFBEB          | #E1AE4C         | #322817         |
-| Danger  | #B43A3A          | #FDEEEE          | #F08080         | #351F24         |
-| Info    | #256AA5          | #EFF6FF          | #77B8E8         | #192C3D         |
-| Neutral | #56616F          | #EEF1F4          | #B4BEC9         | #26303A         |
+Figma pattern: `status/{state}/{text|icon|bg}`. Historical name `danger` → Figma/code `error`.
 
-Token pattern: color/status/{state}/fg and color/status/{state}/bg.
-Use foreground tokens for labels and icons, background tokens for soft containers. Filled status buttons require their own tested on-color pairing.
+| State   | Light text/icon | Light bg | Dark text/icon | Dark bg |
+| ------- | --------------- | -------- | -------------- | ------- |
+| success | #247A4A         | #EDF7F0  | #65C78D        | #142B20 |
+| warning | #92400E         | #FFFBEB  | #E1AE4C        | #302719 |
+| error   | #B43A3A         | #FDEEEE  | #F08080        | #321E23 |
+| info    | #256AA5         | #EFF6FF  | #77B8E8        | #192C3C |
+| neutral | #56616F         | #EEF1F4  | #B4BEC9        | #252D36 |
+
+Theme keys: `theme.colors.status.<state>.{text,icon,bg}` where state is success, warning, error, info, or neutral.
+Use text/icon for labels and icons, bg for soft containers. Filled status buttons require their own tested on-color pairing.
 Always combine status with text and, where useful, an icon. Warning yellow #E0B74D from the earlier palette is decorative only, not small text on white.
 
 ### 4.3 Expressive Backgrounds and Illustration Palette
+
+Proposed only — **not** in current Semantic Figma export. Do not add to generated `light.ts`/`dark.ts` until variables exist in Figma.
 
 | Token              | Light   | Dark    | Allowed use                          |
 | ------------------ | ------- | ------- | ------------------------------------ |
@@ -96,6 +112,43 @@ These are art colors, not business-status colors. Lavender is a small optional i
 Prefer flat fields. No neon, glowing blobs, glass panels, animated gradients, or blurred colored spotlights.
 In application views, keep art outside the main reading region. In login and onboarding, one illustration panel may occupy up to roughly 40% of the desktop composition.
 No decorative artwork behind tables, form labels, charts, or long paragraphs. Background contrast must remain stable.
+
+### 4.4 Primitives (from Quantia · Primitives / Mode 1)
+
+Exported in `src/theme/figma/primitives.tokens.json` and generated into `src/theme/scales.ts`.
+
+| Token               | Value   | Theme key                                            |
+| ------------------- | ------- | ---------------------------------------------------- |
+| spacing/4…64        | 4–64 px | `theme.space[4]` … `theme.space[64]` (rem)           |
+| radius/control      | 6 px    | `theme.radii.control`                                |
+| radius/card         | 10 px   | `theme.radii.card`                                   |
+| radius/featured     | 16 px   | `theme.radii.featured`                               |
+| layout/sidebar      | 240 px  | `theme.layout.sidebar`                               |
+| layout/header       | 64 px   | `theme.layout.header`                                |
+| size/control        | 44 px   | `theme.sizes.control`                                |
+| size/table-row-min  | 48 px   | `theme.sizes.tableRowMin`                            |
+| motion/duration-min | 150     | `theme.motion.duration.fast`                         |
+| motion/duration-max | 250     | `theme.motion.duration.slow`                         |
+| blue/700            | #315C8C | Primitive aliased by Semantic action/primary (Light) |
+| color/value-\*      | hex     | Primitive hex values only; components use Semantic   |
+
+Code adds `motion.duration.base = 200ms` (not in Figma) between min and max.
+
+### 4.5 Component tokens (Mode 1 — not generated yet)
+
+Documented from Figma component export for upcoming component work. Do not hand-copy into screens.
+
+| Token                     | Light example |
+| ------------------------- | ------------- |
+| button/primary/background | #315C8C       |
+| button/primary/hover      | #274A70       |
+| button/primary/pressed    | #203D5C       |
+| button/primary/foreground | #FFFFFF       |
+| field/background          | #FFFFFF       |
+| field/border              | #7B8794       |
+| field/foreground          | #18202A       |
+| table/divider             | #D8DEE6       |
+| table/header/background   | #F0F3F6       |
 
 ## 5. Typography
 
@@ -125,26 +178,27 @@ No all-caps navigation, extreme tracking, gradient text, or oversized dashboard 
 
 ## 6. Spacing, Shape, and Elevation
 
-Spacing tokens: space/4=4, space/8=8, space/12=12, space/16=16, space/24=24, space/32=32, space/48=48, space/64=64 px.
+Spacing tokens (Figma Primitives → `theme.space`): space/4=4, space/8=8, space/12=12, space/16=16, space/24=24, space/32=32, space/48=48, space/64=64 px (consumed as rem).
 Use 8 between icon and label, 8 between label and input, 16–24 within groups, 24 for card padding, 32–48 between major sections, and 48–64 in expressive compositions.
 Parent Stack/Grid components own spacing. Do not fix layout with arbitrary heading margins or empty spacer elements.
 
-Radius tokens: radius/control=6, radius/card=10, radius/featured=16, radius/art-frame=24 px; radius/full=9999 px for circular avatars and intentionally pill-shaped elements.
+Radius tokens (Figma → `theme.radii`): radius/control=6, radius/card=10, radius/featured=16 px; code adds `radii.full=9999rem` for avatars/pills. Proposed only: radius/art-frame=24 px (not in current export).
 The 24 px art frame is for expressive wrappers only, not ordinary tables or cards. Operational buttons remain 6 px, not pills everywhere.
 
-Elevation tokens:
+Elevation tokens (DESIGN.md foundation — not in Figma export yet):
 
 - elevation/0: none; default for operational cards with a subtle border.
-- elevation/1/light: 0 2px 8px rgba(24,32,42,0.08).
-- elevation/2/light: 0 8px 24px rgba(24,32,42,0.16).
-- elevation/1/dark: 0 2px 8px rgba(0,0,0,0.24).
+- elevation/1/light: 0 2px 8px rgba(24,32,42,0.08) → `theme.elevation.sm`.
+- elevation/2/light: 0 8px 24px rgba(24,32,42,0.16) → `theme.elevation.md`.
+- elevation/1/dark: 0 2px 8px rgba(0,0,0,0.24) → `theme.elevation.lg` (shared until dark-specific elevation tokens export).
 - elevation/2/dark: 0 8px 24px rgba(0,0,0,0.40).
   Use level 2 for floating menus and dialogs. Dark elevation also needs a visible surface boundary.
 
 ## 7. Layout and Responsive Patterns
 
-Proposed layout tokens: sidebar=240 px, header=64 px, content-max=1440 px, reading-max=720 px; control-height=44 px, control-large=48 px, table-row-min=48 px, icon-target=44 px.
-Breakpoints: compact below 768 px; medium 768–1199 px; wide 1200 px and above. These are layout thresholds, not device assumptions.
+Layout/size from Figma Primitives: sidebar=240 px, header=64 px, control=44 px, table-row-min=48 px → `theme.layout` / `theme.sizes`. Proposed: content-max=1440 px, reading-max=720 px, control-large=48 px (code: `sizes.containerMax` = 1440 px / 90rem).
+Code breakpoints (DS-93): `theme.breakpoints` + `theme.media.up('sm'|'md'|'lg'|'xl')` = 390 / 768 / 1280 / 1440 px.
+Narrative layout bands: compact below 768 px; medium 768–1279 px; wide 1280 px and above. These are layout thresholds, not device assumptions.
 Wide screens: 12-column content grid, 24 px gap, 32 px outer padding. Medium: 8 columns, 24 px padding. Compact: 4 columns, 16 px gap and padding.
 Use fluid widths and content-driven wrapping. Breakpoints never justify clipped labels or fixed-height text containers.
 
@@ -431,7 +485,7 @@ Hide unauthorized navigation, but never treat hidden UI as authorization. Invest
 
 ## 12. Motion and Microcopy
 
-Motion tokens: motion/fast=150 ms, motion/standard=200 ms, motion/slow=250 ms; ease/standard=cubic-bezier(0.2,0,0,1).
+Motion tokens: Figma `motion/duration-min=150` → `theme.motion.duration.fast`; code `base=200` ms; Figma `motion/duration-max=250` → `theme.motion.duration.slow`; ease/standard=cubic-bezier(0.2,0,0,1).
 Use transform/opacity for panel transitions and short state feedback. Live-update highlight may last 1–2 seconds without flashing. No ambient loops, parallax, cursor effects, or count-up metrics in operational views.
 Respect prefers-reduced-motion; content and actions must work without animation.
 Spanish copy uses concrete verbs: "Guardar avance", "Adjuntar evidencia", "Generar reporte", "Reintentar". Avoid slogans in forms, exaggerated congratulations, and vague "Algo salió mal" errors.

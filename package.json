@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
+    "tokens:build": "node --experimental-strip-types scripts/tokens-to-theme.mts",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "husky"

@@ -1,17 +1,16 @@
-import { darkPalette, lightPalette, type Palette } from "./palette";
+import { darkColors } from "./dark";
 import {
   borderWidths,
   breakpoints,
   elevation,
   fonts,
   media,
-  motion,
-  radii,
-  sizes,
-  space,
   typography,
   zIndices,
-} from "./tokens";
+  type Breakpoint,
+} from "./foundation";
+import { lightColors } from "./light";
+import { layout, motion, radii, sizes, space } from "./scales";
 
 const CSS_VAR_PREFIX = "--q-color";
 
@@ -35,27 +34,29 @@ function mapToCssVars<T extends object>(node: T, path: string[] = []): CssVarMap
   ) as CssVarMap<T>;
 }
 
-/** Serializa una paleta como declaraciones de custom properties para GlobalStyle. */
-export function paletteToCssDeclarations(palette: Palette): string {
+type ColorTree = { readonly [key: string]: string | ColorTree };
+
+/** Serializes a color tree as CSS custom-property declarations for GlobalStyle. */
+export function colorsToCssDeclarations(colors: ColorTree): string {
   const declarations: string[] = [];
-  const walk = (node: object, path: string[]) => {
+  const walk = (node: ColorTree, path: string[]) => {
     for (const [key, value] of Object.entries(node)) {
       const nextPath = [...path, toKebab(key)];
       if (typeof value === "string") {
         declarations.push(`${CSS_VAR_PREFIX}-${nextPath.join("-")}: ${value};`);
       } else {
-        walk(value as object, nextPath);
+        walk(value, nextPath);
       }
     }
   };
-  walk(palette, []);
+  walk(colors, []);
   return declarations.join("\n");
 }
 
-export const theme = {
-  colors: mapToCssVars(lightPalette),
+const shared = {
   space,
   radii,
+  layout,
   borderWidths,
   fonts,
   typography,
@@ -67,7 +68,33 @@ export const theme = {
   zIndices,
 } as const;
 
+export const theme = {
+  colors: mapToCssVars(lightColors),
+  ...shared,
+} as const;
+
 export type AppTheme = typeof theme;
 export type ThemeMode = "light" | "dark" | "system";
+export type ThemeColors = typeof lightColors | typeof darkColors;
 
-export { darkPalette, lightPalette, type Palette };
+export {
+  lightColors,
+  darkColors,
+  space,
+  radii,
+  layout,
+  sizes,
+  motion,
+  borderWidths,
+  fonts,
+  typography,
+  elevation,
+  breakpoints,
+  media,
+  zIndices,
+};
+
+export type { Breakpoint };
+
+/** @deprecated Use colorsToCssDeclarations */
+export const paletteToCssDeclarations = colorsToCssDeclarations;

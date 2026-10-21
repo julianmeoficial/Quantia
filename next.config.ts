@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   compiler: {
     styledComponents: true,
   },
+  /** DS-94 gallery URL from the issue checklist (`/_design` → App Router `/design`). */
+  async redirects() {
+    return [{ source: "/_design", destination: "/design", permanent: false }];
+  },
 };
 
 export default nextConfig;
