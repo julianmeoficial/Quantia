@@ -7,6 +7,7 @@ declare module "styled-components" {
     colors: AppTheme["colors"];
     space: AppTheme["space"];
     radii: AppTheme["radii"];
+    layout: AppTheme["layout"];
     borderWidths: AppTheme["borderWidths"];
     fonts: AppTheme["fonts"];
     typography: AppTheme["typography"];

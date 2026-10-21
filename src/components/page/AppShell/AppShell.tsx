@@ -1,0 +1,195 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
+import styled from "styled-components";
+
+import { IconButton } from "@/components/base";
+import { AppHeader } from "@/components/page/AppHeader";
+import { RoleSidebar } from "@/components/page/RoleSidebar";
+import { ErrorState } from "@/components/system";
+import type { ConnectionState } from "@/components/system";
+import {
+  accessFor,
+  landing,
+  navigationFor,
+  primaryRole,
+  ROLE_LABEL,
+  sectionLabel,
+} from "@/lib/auth";
+import type { SessionIdentity } from "@/lib/auth";
+
+import { MenuIcon, iconForHref } from "./nav-icons";
+
+const Frame = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: ${({ theme }) => theme.colors.bg.canvas};
+`;
+
+const Skip = styled.a`
+  position: absolute;
+  left: ${({ theme }) => theme.space[16]};
+  top: ${({ theme }) => theme.space[16]};
+  z-index: ${({ theme }) => theme.zIndices.modal};
+  transform: translateY(-200%);
+  padding: ${({ theme }) => theme.space[8]} ${({ theme }) => theme.space[12]};
+  border-radius: ${({ theme }) => theme.radii.control};
+  background: ${({ theme }) => theme.colors.bg.surface};
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-size: ${({ theme }) => theme.typography.label.fontSize};
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    transform: translateY(0);
+    outline: ${({ theme }) => theme.borderWidths.thick} solid
+      ${({ theme }) => theme.colors.focus.ring};
+    outline-offset: ${({ theme }) => theme.borderWidths.thick};
+  }
+`;
+
+const Body = styled.div`
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: ${({ theme }) => theme.space[24]};
+  padding: ${({ theme }) => theme.space[16]};
+`;
+
+const InlineNav = styled.div`
+  display: none;
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: block;
+  }
+`;
+
+const MenuSlot = styled.div`
+  display: flex;
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: none;
+  }
+`;
+
+const Main = styled.main`
+  flex: 1;
+  min-width: 0;
+  max-width: ${({ theme }) => theme.sizes.containerMax};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[16]};
+  padding: ${({ theme }) => theme.space[16]};
+
+  ${({ theme }) => theme.media.up("md")} {
+    padding: ${({ theme }) => theme.space[24]};
+  }
+
+  ${({ theme }) => theme.media.up("lg")} {
+    padding: ${({ theme }) => theme.space[32]};
+  }
+
+  h1 {
+    margin: 0;
+    font-size: ${({ theme }) => theme.typography.headingLarge.fontSize};
+    line-height: ${({ theme }) => theme.typography.headingLarge.lineHeight};
+    font-weight: ${({ theme }) => theme.typography.headingLarge.fontWeight};
+    color: ${({ theme }) => theme.colors.text.primary};
+  }
+
+  p {
+    margin: 0;
+    color: ${({ theme }) => theme.colors.text.secondary};
+    font-size: ${({ theme }) => theme.typography.bodyMedium.fontSize};
+    line-height: ${({ theme }) => theme.typography.bodyMedium.lineHeight};
+  }
+`;
+
+export interface AppShellProps {
+  identity: SessionIdentity | null;
+  pathname: string;
+  children?: ReactNode;
+  connection?: ConnectionState;
+  onReconnect?: () => void;
+  onLogout?: () => void;
+  onSessionAction?: () => void;
+}
+
+export function AppShell({
+  identity,
+  pathname,
+  children,
+  connection = "connected",
+  onReconnect,
+  onLogout,
+  onSessionAction,
+}: AppShellProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  if (!identity) {
+    return (
+      <ErrorState
+        variant="session"
+        onSessionAction={onSessionAction}
+        onOpenChange={() => undefined}
+      />
+    );
+  }
+
+  const items = navigationFor(identity.roles).map((entry) => ({
+    ...entry,
+    icon: iconForHref(entry.href),
+  }));
+  const home = landing(identity.roles);
+  const section = sectionLabel(pathname);
+  const role = primaryRole(identity.roles);
+  const denied = accessFor(pathname, identity.roles) === "denied";
+  const crumbs = [
+    { label: "Quantia", href: home ?? undefined },
+    ...(section && !denied ? [{ label: section }] : []),
+  ];
+
+  return (
+    <Frame>
+      <Skip href="#contenido">Saltar al contenido</Skip>
+      <AppHeader
+        crumbs={crumbs}
+        connection={connection}
+        onReconnect={onReconnect}
+        userName={identity.displayName}
+        roleLabel={role ? ROLE_LABEL[role] : undefined}
+        onLogout={onLogout}
+        menu={
+          <MenuSlot>
+            <IconButton
+              accessibleLabel="Abrir navegación"
+              icon={<MenuIcon />}
+              onClick={() => setMenuOpen(true)}
+            />
+          </MenuSlot>
+        }
+      />
+      <Body>
+        <InlineNav>
+          <RoleSidebar items={items} currentPath={pathname} profileName={identity.displayName} />
+        </InlineNav>
+        {menuOpen ? (
+          <RoleSidebar
+            variant="drawer"
+            open
+            onOpenChange={setMenuOpen}
+            items={items}
+            currentPath={pathname}
+            profileName={identity.displayName}
+          />
+        ) : null}
+        <Main id="contenido" tabIndex={-1}>
+          {denied ? <ErrorState variant="forbidden" /> : children}
+        </Main>
+      </Body>
+    </Frame>
+  );
+}
