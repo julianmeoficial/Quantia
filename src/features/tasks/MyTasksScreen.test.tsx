@@ -1,0 +1,110 @@
+import { render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { ThemeProvider } from "styled-components";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { theme } from "@/theme";
+
+import { MyTasksScreen } from "./MyTasksScreen";
+
+function renderScreen(ui: ReactElement) {
+  return render(<ThemeProvider theme={theme}>{ui}</ThemeProvider>);
+}
+
+const reload = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
+vi.mock("@/features/auth/AuthProvider", () => ({
+  useAuth: () => ({
+    user: { id: "user-1", fullName: "Ana Ruiz", roles: ["INVESTIGADOR"] },
+    identity: { displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] },
+    status: "authenticated",
+  }),
+}));
+
+vi.mock("./useMyTasks", () => ({
+  useMyTasks: () => mockUseMyTasks(),
+}));
+
+let mockUseMyTasks: () => unknown;
+
+describe("MyTasksScreen", () => {
+  beforeEach(() => {
+    reload.mockReset();
+  });
+
+  it("shows skeleton while loading", () => {
+    mockUseMyTasks = () => ({
+      status: "loading",
+      data: null,
+      error: null,
+      reload,
+    });
+    renderScreen(<MyTasksScreen />);
+    expect(screen.getAllByText("Cargando…").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Mis tareas" })).toBeInTheDocument();
+  });
+
+  it("shows empty state copy from the checklist", () => {
+    mockUseMyTasks = () => ({
+      status: "ready",
+      data: { tasks: [], monthProgressCount: 0, partialFailures: 0 },
+      error: null,
+      reload,
+    });
+    renderScreen(<MyTasksScreen />);
+    expect(screen.getByText("No tienes tareas pendientes")).toBeInTheDocument();
+    expect(screen.getByText("Tareas vencidas")).toBeInTheDocument();
+    expect(screen.getByText("Esta semana")).toBeInTheDocument();
+    expect(screen.getByText("Avances del mes")).toBeInTheDocument();
+  });
+
+  it("renders KPI values and grouped task titles", () => {
+    mockUseMyTasks = () => ({
+      status: "ready",
+      data: {
+        monthProgressCount: 4,
+        partialFailures: 0,
+        tasks: [
+          {
+            id: "t1",
+            projectId: "p1",
+            projectTitle: "GITEMOS-02",
+            title: "Encuesta piloto",
+            description: null,
+            assigneeId: "user-1",
+            status: "IN_PROGRESS",
+            priority: "HIGH",
+            dueDate: "2026-10-20T05:00:00.000Z",
+            syncStatus: "SYNCED",
+            createdAt: "2026-10-01T00:00:00.000Z",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+          },
+          {
+            id: "t2",
+            projectId: "p1",
+            projectTitle: "GITEMOS-02",
+            title: "Informe parcial",
+            description: null,
+            assigneeId: "user-1",
+            status: "TODO",
+            priority: "MEDIUM",
+            dueDate: "2026-10-25T05:00:00.000Z",
+            syncStatus: "SYNCED",
+            createdAt: "2026-10-01T00:00:00.000Z",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+          },
+        ],
+      },
+      error: null,
+      reload,
+    });
+    renderScreen(<MyTasksScreen />);
+    expect(screen.getAllByText("Encuesta piloto").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Informe parcial").length).toBeGreaterThan(0);
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
+});

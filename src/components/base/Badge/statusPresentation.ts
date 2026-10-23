@@ -1,8 +1,16 @@
+import type { TaskStatus } from "@quantia/contracts";
 import type { ComponentType } from "react";
 
-import { AlertIcon, CheckCircleIcon, CircleIcon, ClockIcon, XIcon } from "@/components/base/icons";
-import type { BadgeTone } from "@/components/base/shared/types";
+import {
+  AlertIcon,
+  CheckCircleIcon,
+  CircleIcon,
+  ClockIcon,
+  MinusIcon,
+  XIcon,
+} from "@/components/base/icons";
 import type { IconProps } from "@/components/base/icons";
+import type { BadgeTone } from "@/components/base/shared/types";
 
 export type DomainBadgeStatus = "delayed" | "in_progress" | "on_track" | "complete" | "missing";
 
@@ -20,6 +28,14 @@ export const STATUS_BADGE: Record<DomainBadgeStatus, StatusBadgePresentation> = 
   complete: { label: "Completa", tone: "success", icon: CheckCircleIcon },
   missing: { label: "Faltante", tone: "neutral", icon: CircleIcon },
 };
+
+/** Contract `TaskStatus` → UI. Single source for Badge / TaskRow / tables. */
+export const TASK_STATUS_PRESENTATION = {
+  TODO: { label: "Por hacer", tone: "neutral", icon: CircleIcon },
+  IN_PROGRESS: { label: "En curso", tone: "info", icon: ClockIcon },
+  BLOCKED: { label: "Bloqueada", tone: "warning", icon: MinusIcon },
+  DONE: { label: "Hecha", tone: "success", icon: CheckCircleIcon },
+} as const satisfies Record<TaskStatus, StatusBadgePresentation>;
 
 export const TONE_ICON: Record<BadgeTone, ComponentType<IconProps>> = {
   neutral: CircleIcon,

@@ -2,6 +2,8 @@ export { loginWithSession, logoutWithSession, refreshWithSession } from "./auth"
 export type { SessionGrant } from "./auth";
 export { api, buildApiUrl, readRetryAfterSeconds, request, type RequestOptions } from "./client";
 export { ApiError, type ApiErrorKind } from "./errors";
+export { listProjectProgress } from "./progress";
+export { getProject, listProjects } from "./projects";
 export {
   configureRefresh,
   expireSession,
@@ -10,4 +12,5 @@ export {
   onSessionExpired,
   setAccessToken,
 } from "./session";
+export { getProjectTask, listProjectTasks, updateProjectTask } from "./tasks";
 export { getMe } from "./users";
