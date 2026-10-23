@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@quantia/contracts";
+import type { DocumentStatus, ProjectStatus, TaskStatus } from "@quantia/contracts";
 import type { ComponentType } from "react";
 
 import {
@@ -36,6 +36,25 @@ export const TASK_STATUS_PRESENTATION = {
   BLOCKED: { label: "Bloqueada", tone: "warning", icon: MinusIcon },
   DONE: { label: "Hecha", tone: "success", icon: CheckCircleIcon },
 } as const satisfies Record<TaskStatus, StatusBadgePresentation>;
+
+/** Contract `ProjectStatus` → UI. */
+export const PROJECT_STATUS_PRESENTATION = {
+  FORMULATION: { label: "En formulación", tone: "neutral", icon: CircleIcon },
+  ACTIVE: { label: "En curso", tone: "info", icon: ClockIcon },
+  DELAYED: { label: "Retrasado", tone: "danger", icon: AlertIcon },
+  COMPLETED: { label: "Completado", tone: "success", icon: CheckCircleIcon },
+  CANCELLED: { label: "Cancelado", tone: "neutral", icon: MinusIcon },
+} as const satisfies Record<ProjectStatus, StatusBadgePresentation>;
+
+/**
+ * Contract `DocumentStatus` → Figma document labels
+ * (Verificado / En revisión / Bloqueado).
+ */
+export const DOCUMENT_STATUS_PRESENTATION = {
+  SCANNED: { label: "Verificado", tone: "success", icon: CheckCircleIcon },
+  UPLOADED: { label: "En revisión", tone: "warning", icon: ClockIcon },
+  QUARANTINED: { label: "Bloqueado", tone: "danger", icon: AlertIcon },
+} as const satisfies Record<DocumentStatus, StatusBadgePresentation>;
 
 export const TONE_ICON: Record<BadgeTone, ComponentType<IconProps>> = {
   neutral: CircleIcon,

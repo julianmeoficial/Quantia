@@ -1,6 +1,15 @@
 export { loginWithSession, logoutWithSession, refreshWithSession } from "./auth";
 export type { SessionGrant } from "./auth";
 export { api, buildApiUrl, readRetryAfterSeconds, request, type RequestOptions } from "./client";
+export {
+  DOCUMENT_ACCEPT,
+  DOCUMENT_MAX_BYTES,
+  deleteProjectDocument,
+  getDocumentDownload,
+  listProjectDocuments,
+  uploadProjectDocument,
+} from "./documents";
+export type { UploadDocumentOptions } from "./documents";
 export { ApiError, type ApiErrorKind } from "./errors";
 export { listProjectProgress } from "./progress";
 export { getProject, listProjects } from "./projects";

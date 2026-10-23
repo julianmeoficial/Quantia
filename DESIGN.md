@@ -257,7 +257,7 @@ Decorative SVGs are hidden from assistive technology and cannot intercept pointe
 
 ## 10. Canonical Component Registry and Interaction Contracts
 
-Inventory correction: the supplied Notion section 4.3 contains 34 components (11 Base + 8 Composite + 8 Page + 7 System), not 33. Retain every named component. Add 3 General Chat components for a total of 37.
+Inventory correction: the supplied Notion section 4.3 contains 34 components (11 Base + 8 Composite + 8 Page + 7 System), not 33. Retain every named component. Tabs (DS-108) is an additional Base component. Add 3 General Chat components for a total of 38.
 These tables define the proposed canonical design APIs, not a claim that repository implementations already exist. Reconcile with current exports and shared contracts before coding; approve migrations instead of creating aliases with divergent styling.
 All controls define default, hover, focus-visible, active, disabled, and loading when applicable. Fields also define error and read-only. Parent layouts own external spacing; component internals use design tokens.
 
@@ -273,7 +273,7 @@ All controls define default, hover, focus-visible, active, disabled, and loading
 In the per-component matrix, N/A means the prop is intentionally absent, not accepted and ignored. Fixed geometry is documented via tokens, not a public size prop. Loading is not equivalent to disabled. Tone describes meaning; intent describes an action's hierarchy.
 For explicit selected/error/checked/connection/delivery states, use the domain/state props below, not invented intent values. Figma-only preview properties for content do not become backend enums.
 
-### 10.2 Base Components (11)
+### 10.2 Base Components (12)
 
 Columns document purpose, anatomy, additional properties, accessibility, Radix ownership, and valid/invalid examples. Shared intent/size/isLoading/tone props are in section 10.6.
 
@@ -290,6 +290,7 @@ Columns document purpose, anatomy, additional properties, accessibility, Radix o
 | Avatar     | Public identity; image, fallback initials                               | name, src, fallback                                                            | Avoid duplicate announcement beside visible name; meaningful alt when standalone             | Radix Avatar: Root, Image, Fallback               | DO: approved public name + initials fallback. DON'T: expose private email as fallback  |
 | Tooltip    | Supplement short information; trigger, content, arrow optional          | content, side, delayDuration from shared configuration                         | Available on focus/hover, Escape dismisses; no essential instructions or interactive content | Radix Tooltip: Provider, Root, Trigger, Content   | DO: explain a compact icon. DON'T: hide form errors inside tooltip                     |
 | Link       | Navigate; label, optional external indicator                            | href, children, external, ariaCurrent                                          | Native anchor, descriptive destination, visible focus; disclose new context if used          | Native anchor / Next.js Link                      | DO: "Ver evidencia". DON'T: anchor without href performing save                        |
+| Tabs       | Switch peer panels; list, triggers, content panels                      | items, value, onValueChange, label                                             | Tablist/tab/tabpanel roles, keyboard arrows, focus-visible ring; controlled URL state OK     | Radix Tabs: Root, List, Trigger, Content          | DO: project Tareas/Bitácora/Documentos. DON'T: nested tabs inside every card           |
 
 ### 10.3 Composite Components (8)
 
@@ -349,6 +350,7 @@ Cells contain the Figma value followed by the code value. All mapped dimensions 
 | Avatar           | N/A                                                              | Medium/Large -> md/lg (32/40 px visual; interactive wrapper >=44 px) | N/A                                           | N/A                                                                        |
 | Tooltip          | N/A                                                              | N/A                                                                  | N/A                                           | N/A                                                                        |
 | Link             | N/A                                                              | N/A                                                                  | N/A                                           | N/A                                                                        |
+| Tabs             | N/A                                                              | N/A                                                                  | N/A                                           | N/A                                                                        |
 | ProjectCard      | N/A                                                              | N/A                                                                  | Loading/Default -> true/false                 | N/A (project status drives Badge)                                          |
 | TaskRow          | N/A                                                              | N/A                                                                  | Loading/Default -> true/false                 | N/A                                                                        |
 | ProgressBar      | N/A                                                              | N/A                                                                  | N/A (indeterminate prop instead)              | Neutral/Info/Success/Warning/Danger -> neutral/info/success/warning/danger |

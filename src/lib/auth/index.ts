@@ -8,4 +8,23 @@ export {
   NAV_CATALOG,
 } from "./navigation";
 export type { AppRole, NavEntry, RouteAccess, SessionIdentity } from "./navigation";
-export { canAccess } from "./permissions";
+export {
+  canAccess,
+  canCreateProgress,
+  canCreateTask,
+  canDeleteDocument,
+  canEditProgress,
+  canEditTask,
+  canGenerateReport,
+  canManageBudget,
+  canManageMembers,
+  canManageProject,
+  canManageUsers,
+  canRetrySync,
+  canSearchUsers,
+  canViewAudit,
+  canViewBudgetDetail,
+  hasProjectAccess,
+  isAdmin,
+  isCoordinator,
+} from "./permissions";

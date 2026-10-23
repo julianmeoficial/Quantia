@@ -1,6 +1,12 @@
 export { Avatar } from "./Avatar";
 export type { AvatarProps } from "./Avatar";
-export { Badge, STATUS_BADGE, TASK_STATUS_PRESENTATION } from "./Badge";
+export {
+  Badge,
+  DOCUMENT_STATUS_PRESENTATION,
+  PROJECT_STATUS_PRESENTATION,
+  STATUS_BADGE,
+  TASK_STATUS_PRESENTATION,
+} from "./Badge";
 export type { BadgeProps, DomainBadgeStatus } from "./Badge";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";
@@ -14,6 +20,8 @@ export { Select } from "./Select";
 export type { SelectOption, SelectProps } from "./Select";
 export { Switch } from "./Switch";
 export type { SwitchProps } from "./Switch";
+export { Tabs } from "./Tabs";
+export type { TabItem, TabsProps } from "./Tabs";
 export { TextArea } from "./TextArea";
 export type { TextAreaProps } from "./TextArea";
 export { TextField } from "./TextField";
