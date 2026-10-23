@@ -1,8 +1,12 @@
 import {
+  createProgressRequestSchema,
   listProgressQuerySchema,
   paginatedProgressResponseSchema,
+  progressResponseSchema,
+  type CreateProgressRequest,
   type ListProgressQuery,
   type PaginatedProgressResponse,
+  type ProgressResponse,
 } from "@quantia/contracts";
 
 import { api } from "./client";
@@ -24,5 +28,15 @@ export function listProjectProgress(
   return api.get(`/projects/${projectId}/progress`, {
     schema: paginatedProgressResponseSchema,
     query: parsed,
+  });
+}
+
+export function createProjectProgress(
+  projectId: string,
+  body: CreateProgressRequest,
+): Promise<ProgressResponse> {
+  const parsed = createProgressRequestSchema.parse(body);
+  return api.post(`/projects/${projectId}/progress`, parsed, {
+    schema: progressResponseSchema,
   });
 }

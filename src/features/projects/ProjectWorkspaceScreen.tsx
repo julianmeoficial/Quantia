@@ -9,7 +9,7 @@ import type {
   UserResponse,
 } from "@quantia/contracts";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   Badge,
@@ -23,6 +23,7 @@ import { ActivityTimeline, DataTable, type DataTableColumn } from "@/components/
 import type { SyncStatusValue } from "@/components/system";
 import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { RegisterProgressPanel } from "@/features/progress";
 import {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
@@ -140,6 +141,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   });
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const registerTriggerRef = useRef<HTMLSpanElement>(null);
 
   const setTab = useCallback(
     (next: string) => {
@@ -461,23 +464,25 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           </S.Meta>
         </S.HeaderText>
         <S.HeaderActions>
-          <Button
-            intent="primary"
-            type="button"
-            onClick={() => {
-              if (!allowProgress) {
-                setToast({
-                  open: true,
-                  title: "No puedes registrar avance",
-                  description: "No tienes permiso para registrar avances en este proyecto.",
-                });
-                return;
-              }
-              setTab("bitacora");
-            }}
-          >
-            Registrar Avance
-          </Button>
+          <span ref={registerTriggerRef}>
+            <Button
+              intent="primary"
+              type="button"
+              onClick={() => {
+                if (!allowProgress) {
+                  setToast({
+                    open: true,
+                    title: "No puedes registrar avance",
+                    description: "No tienes permiso para registrar avances en este proyecto.",
+                  });
+                  return;
+                }
+                setRegisterOpen(true);
+              }}
+            >
+              Registrar Avance
+            </Button>
+          </span>
         </S.HeaderActions>
       </S.Header>
 
@@ -517,6 +522,23 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
       ) : null}
 
       <Tabs label="Secciones del proyecto" value={tab} onValueChange={setTab} items={tabItems} />
+
+      <RegisterProgressPanel
+        open={registerOpen}
+        onOpenChange={setRegisterOpen}
+        projectId={projectId}
+        taskOptions={(tasks.data ?? []).map((task) => ({
+          value: task.id,
+          label: task.title,
+          projectId,
+        }))}
+        triggerRef={registerTriggerRef}
+        onSuccess={() => {
+          reloadProgress();
+          reloadDocuments();
+          if (tab !== "bitacora") setTab("bitacora");
+        }}
+      />
 
       <Toast
         open={toast.open}

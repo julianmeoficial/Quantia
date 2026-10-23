@@ -4,7 +4,12 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-gsap.registerPlugin(useGSAP, ScrollTrigger);
+gsap.registerPlugin(useGSAP);
+
+/** Register ScrollTrigger only in real browsers (jsdom lacks matchMedia by default). */
+if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 /** Usar con `gsap.matchMedia()` para respetar `prefers-reduced-motion`. */
 export const MOTION_QUERIES = {

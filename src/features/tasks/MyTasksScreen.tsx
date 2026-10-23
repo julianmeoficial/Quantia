@@ -1,13 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Badge, TASK_STATUS_PRESENTATION, Tooltip } from "@/components/base";
+import { Badge, Button, TASK_STATUS_PRESENTATION, Tooltip } from "@/components/base";
 import { TaskRow } from "@/components/composite";
 import { DataTable, KpiPanel, type DataTableColumn, type KpiMetric } from "@/components/page";
-import { EmptyState, ErrorState, Skeleton, SyncStatus } from "@/components/system";
+import {
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  SyncStatus,
+  Toast,
+  ToastProvider,
+} from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { RegisterProgressPanel } from "@/features/progress";
 import { canAccess } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate, formatRelativeDue } from "@/lib/format";
@@ -143,9 +151,23 @@ function UrgencyMobile({
 }
 
 export function MyTasksScreen() {
+  return (
+    <ToastProvider>
+      <MyTasksBody />
+    </ToastProvider>
+  );
+}
+
+function MyTasksBody() {
   const router = useRouter();
   const { user, identity } = useAuth();
   const { status, data, error, reload } = useMyTasks();
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
+    open: false,
+    title: "",
+  });
+  const registerTriggerRef = useRef<HTMLSpanElement>(null);
 
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/mis-tareas", roles);
@@ -154,6 +176,16 @@ export function MyTasksScreen() {
     const tasks = [...(data?.tasks ?? [])].sort(compareByDueDate);
     return groupByUrgency(tasks);
   }, [data]);
+
+  const progressTaskOptions = useMemo(
+    () =>
+      (data?.tasks ?? []).map((task) => ({
+        value: task.id,
+        label: `${task.title} · ${task.projectTitle}`,
+        projectId: task.projectId,
+      })),
+    [data?.tasks],
+  );
 
   if (!allowed) {
     return (
@@ -219,8 +251,33 @@ export function MyTasksScreen() {
   return (
     <S.Page>
       <S.Header>
-        <S.Title>Mis tareas</S.Title>
-        <S.Subtitle>Lo más urgente primero. Tu trabajo, sin información institucional.</S.Subtitle>
+        <S.HeaderText>
+          <S.Title>Mis tareas</S.Title>
+          <S.Subtitle>
+            Lo más urgente primero. Tu trabajo, sin información institucional.
+          </S.Subtitle>
+        </S.HeaderText>
+        <S.HeaderActions>
+          <span ref={registerTriggerRef}>
+            <Button
+              intent="primary"
+              type="button"
+              onClick={() => {
+                if (progressTaskOptions.length === 0) {
+                  setToast({
+                    open: true,
+                    title: "No hay tareas para registrar avance",
+                    description: "Cuando tengas tareas asignadas podrás registrar un avance aquí.",
+                  });
+                  return;
+                }
+                setRegisterOpen(true);
+              }}
+            >
+              Registrar avance
+            </Button>
+          </span>
+        </S.HeaderActions>
       </S.Header>
 
       {data && data.partialFailures > 0 ? (
@@ -265,6 +322,24 @@ export function MyTasksScreen() {
           </S.MobileOnly>
         </>
       )}
+
+      <RegisterProgressPanel
+        open={registerOpen}
+        onOpenChange={setRegisterOpen}
+        taskOptions={progressTaskOptions}
+        triggerRef={registerTriggerRef}
+        onSuccess={() => {
+          reload();
+        }}
+      />
+
+      <Toast
+        open={toast.open}
+        onOpenChange={(open) => setToast((prev) => ({ ...prev, open }))}
+        title={toast.title}
+        description={toast.description}
+        tone="warning"
+      />
     </S.Page>
   );
 }
