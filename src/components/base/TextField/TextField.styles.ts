@@ -22,6 +22,19 @@ export const Required = styled.span`
   font-weight: ${({ theme }) => theme.typography.bodyMedium.fontWeight};
 `;
 
+export const ControlRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[8]};
+  width: 100%;
+
+  > input {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+`;
+
 export const Input = styled.input<{ $size: ControlSize }>`
   ${fieldControl}
   min-height: ${({ theme, $size }) => ($size === "lg" ? theme.space[48] : theme.sizes.control)};

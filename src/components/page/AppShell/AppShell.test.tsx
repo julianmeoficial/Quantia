@@ -75,6 +75,21 @@ describe("AppShell", () => {
     expect(sections().getByRole("link", { name: "Usuarios", hidden: true })).toBeInTheDocument();
   });
 
+  it("keeps the screen mounted when the session expires", () => {
+    renderWithTheme(
+      <AppShell
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        pathname="/mis-tareas"
+        sessionExpired
+      >
+        <h1>Mis tareas</h1>
+      </AppShell>,
+    );
+    expect(screen.getByRole("heading", { name: "Mis tareas", hidden: true })).toBeInTheDocument();
+    expect(screen.getByText("Tu sesión expiró")).toBeInTheDocument();
+    expect(sections().getByRole("link", { name: "Mis tareas", hidden: true })).toBeInTheDocument();
+  });
+
   it("does not paint navigation without an identity", () => {
     renderWithTheme(<AppShell identity={null} pathname="/mis-tareas" />);
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();

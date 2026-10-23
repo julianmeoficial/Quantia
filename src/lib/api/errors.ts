@@ -29,6 +29,7 @@ export class ApiError extends Error {
     public readonly status: number | null,
     message: string = DEFAULT_MESSAGES[kind],
     public readonly details?: unknown,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -58,9 +59,15 @@ function readMessage(body: unknown): string | undefined {
  * Normaliza una respuesta fallida. En 401/403/404 se usa siempre el mensaje genérico
  * para no revelar la existencia de recursos fuera del alcance del usuario.
  */
-export function toApiError(status: number, body: unknown): ApiError {
+export function toApiError(status: number, body: unknown, retryAfterSeconds?: number): ApiError {
   const kind = kindFromStatus(status);
   const exposeServerMessage = kind === "validation" || kind === "conflict";
   const message = (exposeServerMessage && readMessage(body)) || DEFAULT_MESSAGES[kind];
-  return new ApiError(kind, status, message, exposeServerMessage ? body : undefined);
+  return new ApiError(
+    kind,
+    status,
+    message,
+    exposeServerMessage ? body : undefined,
+    retryAfterSeconds,
+  );
 }
