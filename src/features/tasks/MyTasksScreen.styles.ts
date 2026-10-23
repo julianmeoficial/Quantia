@@ -13,7 +13,25 @@ export const Page = styled.div`
 export const Header = styled.header`
   display: flex;
   flex-direction: column;
+  gap: ${({ theme }) => theme.space[16]};
+
+  ${({ theme }) => theme.media.up("md")} {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+`;
+
+export const HeaderText = styled.div`
+  display: flex;
+  flex-direction: column;
   gap: ${({ theme }) => theme.space[8]};
+  min-width: 0;
+`;
+
+export const HeaderActions = styled.div`
+  display: flex;
+  flex-shrink: 0;
 `;
 
 export const Title = styled.h1`

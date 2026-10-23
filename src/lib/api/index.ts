@@ -11,7 +11,7 @@ export {
 } from "./documents";
 export type { UploadDocumentOptions } from "./documents";
 export { ApiError, type ApiErrorKind } from "./errors";
-export { listProjectProgress } from "./progress";
+export { createProjectProgress, listProjectProgress } from "./progress";
 export { getProject, listProjects } from "./projects";
 export {
   configureRefresh,

@@ -7,6 +7,8 @@ export type { EmptyStateKind, EmptyStateProps } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export type { ErrorStateProps, ErrorStateVariant } from "./ErrorState";
 export { liveUpdateHighlight } from "./highlight";
+export { Sheet } from "./Sheet";
+export type { SheetProps } from "./Sheet";
 export { Skeleton } from "./Skeleton";
 export type { SkeletonProps, SkeletonVariant } from "./Skeleton";
 export { SyncStatus } from "./SyncStatus";
