@@ -1,6 +1,6 @@
 export { Avatar } from "./Avatar";
 export type { AvatarProps } from "./Avatar";
-export { Badge, STATUS_BADGE } from "./Badge";
+export { Badge, STATUS_BADGE, TASK_STATUS_PRESENTATION } from "./Badge";
 export type { BadgeProps, DomainBadgeStatus } from "./Badge";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";

@@ -1,5 +1,5 @@
-import { SectionStub } from "../section-stub";
+import { MyTasksScreen } from "@/features/tasks";
 
 export default function MisTareasPage() {
-  return <SectionStub title="Mis tareas" />;
+  return <MyTasksScreen />;
 }
