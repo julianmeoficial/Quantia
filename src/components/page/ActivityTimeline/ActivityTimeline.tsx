@@ -3,6 +3,7 @@
 import styled from "styled-components";
 
 import { Avatar, Button, Link } from "@/components/base";
+import { SyncStatus, type SyncStatusValue } from "@/components/system";
 import { formatDate } from "@/lib/format";
 
 const List = styled.ol`
@@ -30,6 +31,13 @@ const Body = styled.div`
   gap: ${({ theme }) => theme.space[8]};
 `;
 
+const MetaRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[12]};
+`;
+
 const Text = styled.p`
   margin: 0;
   color: ${({ theme }) => theme.colors.text.primary};
@@ -48,6 +56,8 @@ export interface ActivityItem {
   text: string;
   evidenceHref?: string;
   evidenceLabel?: string;
+  /** When set, renders SyncStatus for the entry (Notion sync). */
+  syncStatus?: SyncStatusValue;
 }
 
 export interface ActivityTimelineProps {
@@ -76,9 +86,14 @@ export function ActivityTimeline({
               <Text>
                 <strong>{item.actor}.</strong> {item.text}
               </Text>
-              <Time dateTime={item.at}>{formatDate(item.at, { withTime: true })}</Time>
+              <MetaRow>
+                <Time dateTime={item.at}>{formatDate(item.at, { withTime: true })}</Time>
+                {item.syncStatus ? <SyncStatus status={item.syncStatus} persisted /> : null}
+              </MetaRow>
               {item.evidenceHref && item.evidenceLabel ? (
-                <Link href={item.evidenceHref}>{item.evidenceLabel}</Link>
+                <Link href={item.evidenceHref} external>
+                  {item.evidenceLabel}
+                </Link>
               ) : null}
             </Body>
           </Item>
