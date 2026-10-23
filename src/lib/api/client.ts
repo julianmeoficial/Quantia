@@ -1,3 +1,4 @@
+import { HttpHeader } from "@quantia/contracts";
 import type { z } from "zod";
 
 import { env } from "@/config/env";
@@ -18,6 +19,13 @@ export type RequestOptions<S extends z.ZodType> = Omit<RequestInit, "body" | "cr
   query?: Record<string, QueryValue>;
   /** `false` para endpoints públicos (no se adjunta el token ni se intenta refresh). */
   auth?: boolean;
+  /**
+   * `false` en login: el 429 debe llegar al formulario con `Retry-After`,
+   * sin el reintento silencioso del cliente.
+   */
+  rateLimitRetry?: boolean;
+  /** `false` evita un segundo refresh (p. ej. revalidar `/users/me` justo después de rotar). */
+  retryUnauthorized?: boolean;
 };
 
 export function buildApiUrl(path: string, query?: Record<string, QueryValue>) {
@@ -35,10 +43,17 @@ async function parseBody(response: Response): Promise<unknown> {
   return contentType.includes("application/json") ? response.json() : response.text();
 }
 
+export function readRetryAfterSeconds(response: Response): number | undefined {
+  const header = response.headers.get(HttpHeader.RETRY_AFTER);
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+  return Math.trunc(seconds);
+}
+
 function retryAfterMs(response: Response) {
-  const header = response.headers.get("retry-after");
-  const seconds = header ? Number(header) : Number.NaN;
-  const ms = Number.isFinite(seconds) ? seconds * 1_000 : DEFAULT_RETRY_AFTER_MS;
+  const seconds = readRetryAfterSeconds(response);
+  const ms = seconds === undefined ? DEFAULT_RETRY_AFTER_MS : seconds * 1_000;
   return Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS);
 }
 
@@ -60,7 +75,16 @@ function wait(ms: number, signal?: AbortSignal | null) {
  */
 export async function request<S extends z.ZodType>(
   path: string,
-  { schema, body, query, auth = true, headers, ...init }: RequestOptions<S>,
+  {
+    schema,
+    body,
+    query,
+    auth = true,
+    rateLimitRetry = true,
+    retryUnauthorized = true,
+    headers,
+    ...init
+  }: RequestOptions<S>,
 ): Promise<z.infer<S>> {
   const isJsonBody = body !== undefined && !(body instanceof FormData);
   const url = buildApiUrl(path, query);
@@ -84,14 +108,14 @@ export async function request<S extends z.ZodType>(
   try {
     response = await send();
 
-    if (response.status === 401 && auth) {
+    if (response.status === 401 && auth && retryUnauthorized) {
       const token = await refreshAccessToken();
       if (!token) {
         expireSession();
-        throw toApiError(401, undefined);
+        throw toApiError(401, undefined, readRetryAfterSeconds(response));
       }
       response = await send();
-    } else if (response.status === 429) {
+    } else if (response.status === 429 && rateLimitRetry) {
       await wait(retryAfterMs(response), init.signal);
       response = await send();
     }
@@ -104,8 +128,8 @@ export async function request<S extends z.ZodType>(
   const data = await parseBody(response).catch(() => undefined);
 
   if (!response.ok) {
-    if (response.status === 401 && auth) expireSession();
-    throw toApiError(response.status, data);
+    if (response.status === 401 && auth && retryUnauthorized) expireSession();
+    throw toApiError(response.status, data, readRetryAfterSeconds(response));
   }
 
   const result = schema.safeParse(data);

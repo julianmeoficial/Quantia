@@ -116,6 +116,8 @@ export interface AppShellProps {
   onReconnect?: () => void;
   onLogout?: () => void;
   onSessionAction?: () => void;
+  /** Modal de sesión encima de la vista, sin desmontarla. */
+  sessionExpired?: boolean;
 }
 
 export function AppShell({
@@ -126,6 +128,7 @@ export function AppShell({
   onReconnect,
   onLogout,
   onSessionAction,
+  sessionExpired = false,
 }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -190,6 +193,14 @@ export function AppShell({
           {denied ? <ErrorState variant="forbidden" /> : children}
         </Main>
       </Body>
+      {sessionExpired ? (
+        <ErrorState
+          variant="session"
+          open
+          onSessionAction={onSessionAction}
+          onOpenChange={() => undefined}
+        />
+      ) : null}
     </Frame>
   );
 }

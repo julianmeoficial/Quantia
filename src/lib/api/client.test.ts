@@ -71,6 +71,25 @@ describe("api client", () => {
     unsubscribe();
   });
 
+  it("no reintenta un 429 de login y expone Retry-After", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(429, {}, { "retry-after": "60" }));
+
+    const error = await api
+      .post(
+        "/auth/login",
+        { email: "a@b.co", password: "secretos" },
+        {
+          schema,
+          auth: false,
+          rateLimitRetry: false,
+        },
+      )
+      .catch((caught: unknown) => caught);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(error).toMatchObject({ kind: "rate_limited", retryAfterSeconds: 60 });
+  });
+
   it("reintenta una vez ante 429 respetando Retry-After", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(429, {}, { "retry-after": "0" }))

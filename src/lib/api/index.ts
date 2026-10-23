@@ -1,9 +1,13 @@
-export { api, buildApiUrl, request, type RequestOptions } from "./client";
+export { loginWithSession, logoutWithSession, refreshWithSession } from "./auth";
+export type { SessionGrant } from "./auth";
+export { api, buildApiUrl, readRetryAfterSeconds, request, type RequestOptions } from "./client";
 export { ApiError, type ApiErrorKind } from "./errors";
 export {
   configureRefresh,
   expireSession,
   getAccessToken,
+  onAccessToken,
   onSessionExpired,
   setAccessToken,
 } from "./session";
+export { getMe } from "./users";

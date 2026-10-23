@@ -1,10 +1,5 @@
-import { StatusView } from "./_components/status-view";
+import { HomeGate } from "@/features/auth/HomeGate";
 
 export default function HomePage() {
-  return (
-    <StatusView
-      title="Quantia"
-      description="Gestión de proyectos de investigación del semillero INNOVATEK'S / GITEMOS."
-    />
-  );
+  return <HomeGate />;
 }
