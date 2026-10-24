@@ -163,16 +163,18 @@ export function DesignCompositeSections() {
             actions={[{ id: "open", label: "Abrir ficha", onSelect: () => undefined }]}
           />
           <ul>
-            <TaskRow
-              title="Cargar evidencia de octubre"
-              href="/design"
-              assignee="Ana Ruiz"
-              status="on_track"
-              due="2026-10-28T05:00:00.000Z"
-              canUpdate
-              checked={done}
-              onCheckedChange={setDone}
-            />
+            <li>
+              <TaskRow
+                title="Cargar evidencia de octubre"
+                href="/design"
+                assignee="Ana Ruiz"
+                status="on_track"
+                due="2026-10-28T05:00:00.000Z"
+                canUpdate
+                checked={done}
+                onCheckedChange={setDone}
+              />
+            </li>
           </ul>
         </Block>
         <Block>

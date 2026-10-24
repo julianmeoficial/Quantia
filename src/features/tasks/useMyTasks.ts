@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/features/auth/AuthProvider";
+import { pollWithBackoff } from "@/lib/async/pollWithBackoff";
 import { ApiError } from "@/lib/api/errors";
 
 import { fetchMyTasks, type MyTasksResult } from "./fetchMyTasks";
@@ -23,6 +24,10 @@ type Snapshot = {
 };
 
 const INITIAL: Snapshot = { status: "idle", data: null, error: null };
+
+function hasPendingSync(data: MyTasksResult | null): boolean {
+  return Boolean(data?.tasks.some((task) => task.syncStatus === "PENDING"));
+}
 
 export function useMyTasks(): UseMyTasksState {
   const { user, status: authStatus } = useAuth();
@@ -77,6 +82,27 @@ export function useMyTasks(): UseMyTasksState {
       document.removeEventListener("visibilitychange", onFocus);
     };
   }, [reload]);
+
+  const pendingSync = hasPendingSync(snapshot.data);
+
+  useEffect(() => {
+    if (!pendingSync || authStatus !== "authenticated" || !user) return;
+
+    const controller = new AbortController();
+
+    void pollWithBackoff({
+      fetch: () => fetchMyTasks(user.id),
+      isDone: (result) => !hasPendingSync(result),
+      signal: controller.signal,
+      onUpdate: (result) => {
+        setSnapshot({ status: "ready", data: result, error: null });
+      },
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [pendingSync, authStatus, user]);
 
   return { ...snapshot, reload };
 }
