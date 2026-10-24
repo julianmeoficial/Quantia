@@ -15,6 +15,7 @@ const reload = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/features/auth/AuthProvider", () => ({
@@ -106,5 +107,7 @@ describe("MyTasksScreen", () => {
     expect(screen.getAllByText("Encuesta piloto").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Informe parcial").length).toBeGreaterThan(0);
     expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver mi proyecto" })).toBeInTheDocument();
   });
 });

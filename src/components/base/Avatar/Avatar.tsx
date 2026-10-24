@@ -32,7 +32,8 @@ export function Avatar({ name, src, fallback, size = "md", announceName = true }
   return (
     <S.Root $size={size}>
       {src ? <S.Image src={src} alt={announceName ? name : ""} /> : null}
-      <S.Fallback delayMs={src ? 400 : 0} aria-hidden={!announceName}>
+      {/* delayMs must stay 0 without src — a positive delay mismatches SSR/client HTML. */}
+      <S.Fallback delayMs={0} aria-hidden={!announceName}>
         {initials}
       </S.Fallback>
     </S.Root>

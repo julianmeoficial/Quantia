@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-import { Badge, Button, TASK_STATUS_PRESENTATION, Tooltip } from "@/components/base";
+import { Badge, Button, Select, TASK_STATUS_PRESENTATION, Tooltip } from "@/components/base";
 import { TaskRow } from "@/components/composite";
 import { DataTable, KpiPanel, type DataTableColumn, type KpiMetric } from "@/components/page";
 import {
@@ -22,6 +22,15 @@ import { formatDate, formatRelativeDue } from "@/lib/format";
 
 import type { MyTaskRow } from "./fetchMyTasks";
 import * as S from "./MyTasksScreen.styles";
+import {
+  ALL_PROJECTS,
+  PENDING_STATUS,
+  filterMyTasks,
+  parseProjectFilter,
+  parseStatusFilter,
+  uniqueProjects,
+  type MyTasksStatusFilter,
+} from "./myTasksFilters";
 import { useMyTasks } from "./useMyTasks";
 import {
   URGENCY_LABEL,
@@ -106,11 +115,26 @@ function syncFromTasks(tasks: MyTaskRow[]): "pending" | "failed" | "synced" {
   return "synced";
 }
 
+const STATUS_FILTER_OPTIONS = [
+  { value: PENDING_STATUS, label: "Todos mis pendientes" },
+  { value: "TODO", label: TASK_STATUS_PRESENTATION.TODO.label },
+  { value: "IN_PROGRESS", label: TASK_STATUS_PRESENTATION.IN_PROGRESS.label },
+  { value: "BLOCKED", label: TASK_STATUS_PRESENTATION.BLOCKED.label },
+];
+
 function UrgencyDesktop({ bucket, rows }: { bucket: UrgencyBucket; rows: MyTaskRow[] }) {
   if (rows.length === 0) return null;
   return (
     <S.Section aria-labelledby={`urgency-${bucket}`}>
-      <S.SectionTitle id={`urgency-${bucket}`}>{URGENCY_LABEL[bucket]}</S.SectionTitle>
+      <S.SectionHeading>
+        <S.SectionTitle id={`urgency-${bucket}`}>{URGENCY_LABEL[bucket]}</S.SectionTitle>
+        {bucket === "overdue" ? (
+          <Badge
+            label={`${rows.length} ${rows.length === 1 ? "pendiente" : "pendientes"}`}
+            tone="danger"
+          />
+        ) : null}
+      </S.SectionHeading>
       <DataTable
         caption={`${URGENCY_LABEL[bucket]} — mis tareas`}
         columns={COLUMNS}
@@ -124,29 +148,98 @@ function UrgencyDesktop({ bucket, rows }: { bucket: UrgencyBucket; rows: MyTaskR
 function UrgencyMobile({
   bucket,
   rows,
-  assigneeName,
+  onRegister,
 }: {
   bucket: UrgencyBucket;
   rows: MyTaskRow[];
-  assigneeName: string;
+  onRegister: (task: MyTaskRow) => void;
 }) {
   if (rows.length === 0) return null;
   return (
     <S.Section aria-labelledby={`urgency-m-${bucket}`}>
-      <S.SectionTitle id={`urgency-m-${bucket}`}>{URGENCY_LABEL[bucket]}</S.SectionTitle>
+      <S.SectionHeading>
+        <S.SectionTitle id={`urgency-m-${bucket}`}>{URGENCY_LABEL[bucket]}</S.SectionTitle>
+        {bucket === "overdue" ? (
+          <Badge
+            label={`${rows.length} ${rows.length === 1 ? "pendiente" : "pendientes"}`}
+            tone="danger"
+          />
+        ) : null}
+      </S.SectionHeading>
       <S.TaskList>
         {rows.map((row) => (
-          <TaskRow
-            key={row.id}
-            title={row.title}
-            href={`/proyectos/${row.projectId}`}
-            assignee={row.projectTitle || assigneeName}
-            status={row.status}
-            due={row.dueDate}
-          />
+          <S.MobileTaskCard key={row.id}>
+            <TaskRow
+              title={row.title}
+              href={`/proyectos/${row.projectId}`}
+              assignee={row.projectTitle}
+              status={row.status}
+              due={row.dueDate}
+            />
+            <S.MobileTaskActions>
+              <Button
+                intent="secondary"
+                type="button"
+                onClick={() => onRegister(row)}
+                aria-label={`Registrar avance para ${row.title}`}
+              >
+                Registrar avance
+              </Button>
+            </S.MobileTaskActions>
+          </S.MobileTaskCard>
         ))}
       </S.TaskList>
     </S.Section>
+  );
+}
+
+function TaskFilters({
+  initialProjectId,
+  initialStatus,
+  projectOptions,
+  filtersActive,
+  onApply,
+  onClear,
+}: {
+  initialProjectId: string;
+  initialStatus: MyTasksStatusFilter;
+  projectOptions: { value: string; label: string }[];
+  filtersActive: boolean;
+  onApply: (projectId: string, status: MyTasksStatusFilter) => void;
+  onClear: () => void;
+}) {
+  const [draftProjectId, setDraftProjectId] = useState(initialProjectId);
+  const [draftStatus, setDraftStatus] = useState<MyTasksStatusFilter>(initialStatus);
+
+  return (
+    <S.FilterGrid>
+      <Select
+        label="Proyecto"
+        options={projectOptions}
+        value={draftProjectId}
+        onValueChange={setDraftProjectId}
+      />
+      <Select
+        label="Estado"
+        options={STATUS_FILTER_OPTIONS}
+        value={draftStatus}
+        onValueChange={(value) => setDraftStatus(parseStatusFilter(value))}
+      />
+      <S.FilterActions>
+        <Button
+          intent="secondary"
+          type="button"
+          onClick={() => onApply(draftProjectId, draftStatus)}
+        >
+          Aplicar
+        </Button>
+        {filtersActive ? (
+          <Button intent="ghost" type="button" onClick={onClear}>
+            Limpiar filtros
+          </Button>
+        ) : null}
+      </S.FilterActions>
+    </S.FilterGrid>
   );
 }
 
@@ -160,22 +253,32 @@ export function MyTasksScreen() {
 
 function MyTasksBody() {
   const router = useRouter();
-  const { user, identity } = useAuth();
+  const searchParams = useSearchParams();
+  const { identity } = useAuth();
   const { status, data, error, reload } = useMyTasks();
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerTaskId, setRegisterTaskId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
     title: "",
   });
   const registerTriggerRef = useRef<HTMLSpanElement>(null);
 
+  const appliedProjectId = parseProjectFilter(searchParams.get("projectId"));
+  const appliedStatus = parseStatusFilter(searchParams.get("status"));
+  const filterKey = `${appliedProjectId}|${appliedStatus}`;
+
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/mis-tareas", roles);
 
-  const grouped = useMemo(() => {
+  const projects = useMemo(() => uniqueProjects(data?.tasks ?? []), [data?.tasks]);
+
+  const filteredTasks = useMemo(() => {
     const tasks = [...(data?.tasks ?? [])].sort(compareByDueDate);
-    return groupByUrgency(tasks);
-  }, [data]);
+    return filterMyTasks(tasks, appliedProjectId, appliedStatus);
+  }, [appliedProjectId, appliedStatus, data?.tasks]);
+
+  const grouped = useMemo(() => groupByUrgency(filteredTasks), [filteredTasks]);
 
   const progressTaskOptions = useMemo(
     () =>
@@ -183,9 +286,42 @@ function MyTasksBody() {
         value: task.id,
         label: `${task.title} · ${task.projectTitle}`,
         projectId: task.projectId,
+        projectTitle: task.projectTitle,
       })),
     [data?.tasks],
   );
+
+  const projectOptions = useMemo(
+    () => [
+      { value: ALL_PROJECTS, label: "Todos los proyectos" },
+      ...projects.map((project) => ({ value: project.id, label: project.title })),
+    ],
+    [projects],
+  );
+
+  const viewProjectId =
+    appliedProjectId !== ALL_PROJECTS
+      ? appliedProjectId
+      : projects.length === 1
+        ? projects[0]!.id
+        : null;
+
+  const clearFilters = () => {
+    router.replace("/mis-tareas");
+  };
+
+  const openRegister = (taskId?: string | null) => {
+    if (progressTaskOptions.length === 0) {
+      setToast({
+        open: true,
+        title: "No hay tareas para registrar avance",
+        description: "Cuando tengas tareas asignadas podrás registrar un avance aquí.",
+      });
+      return;
+    }
+    setRegisterTaskId(taskId ?? null);
+    setRegisterOpen(true);
+  };
 
   if (!allowed) {
     return (
@@ -244,9 +380,11 @@ function MyTasksBody() {
     return <ErrorState variant="server" onRetry={reload} />;
   }
 
-  const tasks = data?.tasks ?? [];
-  const isEmpty = tasks.length === 0;
-  const sync = syncFromTasks(tasks);
+  const allTasks = data?.tasks ?? [];
+  const isEmptyAll = allTasks.length === 0;
+  const isEmptyFiltered = filteredTasks.length === 0;
+  const filtersActive = appliedProjectId !== ALL_PROJECTS || appliedStatus !== PENDING_STATUS;
+  const sync = syncFromTasks(allTasks);
 
   return (
     <S.Page>
@@ -259,21 +397,7 @@ function MyTasksBody() {
         </S.HeaderText>
         <S.HeaderActions>
           <span ref={registerTriggerRef}>
-            <Button
-              intent="primary"
-              type="button"
-              onClick={() => {
-                if (progressTaskOptions.length === 0) {
-                  setToast({
-                    open: true,
-                    title: "No hay tareas para registrar avance",
-                    description: "Cuando tengas tareas asignadas podrás registrar un avance aquí.",
-                  });
-                  return;
-                }
-                setRegisterOpen(true);
-              }}
-            >
+            <Button intent="primary" type="button" onClick={() => openRegister()}>
               Registrar avance
             </Button>
           </span>
@@ -288,6 +412,35 @@ function MyTasksBody() {
 
       {sync !== "synced" ? <SyncStatus status={sync} persisted canRetry={false} /> : null}
 
+      {!isEmptyAll ? (
+        <S.Toolbar>
+          {viewProjectId ? (
+            <Button
+              intent="secondary"
+              type="button"
+              onClick={() => router.push(`/proyectos/${viewProjectId}`)}
+            >
+              Ver mi proyecto
+            </Button>
+          ) : null}
+          <TaskFilters
+            key={filterKey}
+            initialProjectId={appliedProjectId}
+            initialStatus={appliedStatus}
+            projectOptions={projectOptions}
+            filtersActive={filtersActive}
+            onClear={clearFilters}
+            onApply={(projectId, status) => {
+              const params = new URLSearchParams();
+              if (projectId !== ALL_PROJECTS) params.set("projectId", projectId);
+              if (status !== PENDING_STATUS) params.set("status", status);
+              const query = params.toString();
+              router.replace(query ? `/mis-tareas?${query}` : "/mis-tareas");
+            }}
+          />
+        </S.Toolbar>
+      ) : null}
+
       <KpiPanel
         period="Personal"
         metrics={buildMetrics(
@@ -297,11 +450,22 @@ function MyTasksBody() {
         )}
       />
 
-      {isEmpty ? (
+      {isEmptyAll ? (
         <EmptyState
           kind="no-records"
           title="No tienes tareas pendientes"
           description="Cuando te asignen trabajo en un proyecto, aparecerá aquí ordenado por urgencia."
+        />
+      ) : isEmptyFiltered ? (
+        <EmptyState
+          kind="no-results"
+          title="No hay tareas con estos filtros"
+          description="Prueba a cambiar el proyecto o el estado, o limpia los filtros."
+          action={
+            <Button intent="secondary" type="button" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          }
         />
       ) : (
         <>
@@ -316,7 +480,7 @@ function MyTasksBody() {
                 key={bucket}
                 bucket={bucket}
                 rows={grouped[bucket]}
-                assigneeName={user?.fullName ?? "Tú"}
+                onRegister={(task) => openRegister(task.id)}
               />
             ))}
           </S.MobileOnly>
@@ -325,8 +489,12 @@ function MyTasksBody() {
 
       <RegisterProgressPanel
         open={registerOpen}
-        onOpenChange={setRegisterOpen}
+        onOpenChange={(open) => {
+          setRegisterOpen(open);
+          if (!open) setRegisterTaskId(null);
+        }}
         taskOptions={progressTaskOptions}
+        initialTaskId={registerTaskId}
         triggerRef={registerTriggerRef}
         onSuccess={() => {
           reload();

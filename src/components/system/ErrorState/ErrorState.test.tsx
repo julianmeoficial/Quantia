@@ -7,6 +7,24 @@ import { theme } from "@/theme";
 import { ErrorState } from "./ErrorState";
 
 describe("ErrorState", () => {
+  it("session dialog keeps product CTA and draft copy", () => {
+    const onSessionAction = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <ErrorState variant="session" onSessionAction={onSessionAction} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText("Tu sesión expiró")).toBeInTheDocument();
+    expect(
+      screen.getByText(/El borrador permitido se conserva en el contexto de la aplicación/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/No se vuelve a enviar una acción automáticamente/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar sesión" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar avance" })).not.toBeInTheDocument();
+  });
+
   it("forbidden copy never reveals a resource id", () => {
     render(
       <ThemeProvider theme={theme}>

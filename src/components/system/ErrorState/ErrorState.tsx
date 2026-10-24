@@ -3,10 +3,13 @@
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/base";
+import { Button, IconButton } from "@/components/base";
 import { AlertIcon, XIcon } from "@/components/base/icons";
 
 import * as S from "./ErrorState.styles";
+
+const SESSION_FOOTNOTE =
+  "No se vuelve a enviar una acción automáticamente al reautenticar. Debes revisar permisos e intención.";
 
 export type ErrorStateVariant = "forbidden" | "rate-limit" | "session" | "server" | "not-found";
 
@@ -43,7 +46,7 @@ const DEFAULTS: Record<
   session: {
     title: "Tu sesión expiró",
     description:
-      "Inicia sesión de nuevo para continuar. Tu borrador se conservará cuando sea posible.",
+      "Inicia sesión de nuevo para continuar. El borrador permitido se conserva en el contexto de la aplicación.",
     retryLabel: "Iniciar sesión",
   },
   server: {
@@ -148,12 +151,22 @@ function SessionDialog({
             root?.querySelector<HTMLElement>("[data-session-action]")?.focus();
           }}
         >
-          <S.IconSlot aria-hidden>
-            <AlertIcon />
-          </S.IconSlot>
-          <S.DialogTitle>{title}</S.DialogTitle>
-          <S.DialogDescription>{description}</S.DialogDescription>
-          <S.Actions>
+          <S.DialogHeader>
+            <S.DialogTitle>{title}</S.DialogTitle>
+            <IconButton
+              accessibleLabel="Cerrar e iniciar sesión"
+              icon={<XIcon />}
+              intent="ghost"
+              onClick={onSessionAction}
+              disabled={isLoading}
+            />
+          </S.DialogHeader>
+          <S.DialogDivider />
+          <S.DialogBody>
+            <S.DialogDescription>{description}</S.DialogDescription>
+            <S.DialogFootnote>{SESSION_FOOTNOTE}</S.DialogFootnote>
+          </S.DialogBody>
+          <S.DialogActions>
             <Button
               intent="primary"
               data-session-action
@@ -162,7 +175,7 @@ function SessionDialog({
             >
               {actionLabel}
             </Button>
-          </S.Actions>
+          </S.DialogActions>
         </S.DialogContent>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
