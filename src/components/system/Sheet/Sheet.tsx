@@ -152,7 +152,6 @@ export function Sheet({
           <S.Header>
             <S.HeaderText>
               <S.Title>{title}</S.Title>
-              {description ? <S.Description>{description}</S.Description> : null}
             </S.HeaderText>
             <IconButton
               accessibleLabel="Cerrar panel"
@@ -161,6 +160,7 @@ export function Sheet({
               onClick={requestClose}
             />
           </S.Header>
+          {description ? <S.Description>{description}</S.Description> : null}
           <S.Body>{children}</S.Body>
           {footer ? <S.Footer>{footer}</S.Footer> : null}
         </S.Content>

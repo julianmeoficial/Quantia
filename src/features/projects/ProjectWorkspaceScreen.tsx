@@ -480,7 +480,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
                 setRegisterOpen(true);
               }}
             >
-              Registrar Avance
+              Registrar avance
             </Button>
           </span>
         </S.HeaderActions>
@@ -531,6 +531,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           value: task.id,
           label: task.title,
           projectId,
+          projectTitle: project?.title,
         }))}
         triggerRef={registerTriggerRef}
         onSuccess={() => {

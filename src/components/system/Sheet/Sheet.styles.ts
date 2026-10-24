@@ -44,11 +44,11 @@ export const Content = styled(DialogPrimitive.Content)`
 
 export const Header = styled.div`
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: ${({ theme }) => theme.space[12]};
   flex-shrink: 0;
-  padding: ${({ theme }) => theme.space[24]};
+  padding: ${({ theme }) => `${theme.space[16]} ${theme.space[16]} ${theme.space[12]}`};
   border-bottom: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
 `;
@@ -58,6 +58,7 @@ export const HeaderText = styled.div`
   flex-direction: column;
   gap: ${({ theme }) => theme.space[8]};
   min-width: 0;
+  flex: 1;
 `;
 
 export const Title = styled(DialogPrimitive.Title)`
@@ -70,16 +71,18 @@ export const Title = styled(DialogPrimitive.Title)`
 
 export const Description = styled(DialogPrimitive.Description)`
   margin: 0;
+  padding: ${({ theme }) => `${theme.space[12]} ${theme.space[16]} 0`};
+  text-align: center;
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
   line-height: ${({ theme }) => theme.typography.bodySmall.lineHeight};
-  color: ${({ theme }) => theme.colors.text.secondary};
+  color: ${({ theme }) => theme.colors.text.primary};
 `;
 
 export const Body = styled.div`
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: ${({ theme }) => theme.space[24]};
+  padding: ${({ theme }) => theme.space[16]};
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space[16]};
@@ -88,11 +91,15 @@ export const Body = styled.div`
 export const Footer = styled.div`
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: ${({ theme }) => theme.space[12]};
+  justify-content: center;
+  gap: ${({ theme }) => theme.space[24]};
   flex-shrink: 0;
-  padding: ${({ theme }) => theme.space[16]} ${({ theme }) => theme.space[24]};
+  padding: ${({ theme }) => `${theme.space[12]} ${theme.space[16]} ${theme.space[16]}`};
   border-top: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
   background: ${({ theme }) => theme.colors.bg.surface};
+
+  & > * {
+    min-width: 10rem;
+  }
 `;

@@ -22,6 +22,7 @@ export type ProgressTaskOption = {
   value: string;
   label: string;
   projectId: string;
+  projectTitle?: string;
 };
 
 export interface RegisterProgressPanelProps {
@@ -83,6 +84,13 @@ export function RegisterProgressPanel({
 
   const selectedTask = scopedTasks.find((option) => option.value === taskId);
   const resolvedProjectId = fixedProjectId ?? selectedTask?.projectId ?? null;
+  const projectTitle =
+    selectedTask?.projectTitle ??
+    scopedTasks.find((option) => option.projectId === resolvedProjectId)?.projectTitle ??
+    null;
+  const sheetSubtitle = projectTitle
+    ? `Proyecto · ${projectTitle}`
+    : "Describe el trabajo realizado. La sincronización con Notion no borra lo guardado en Quantia.";
 
   const hydrate = useCallback(() => {
     const draftProjectId = fixedProjectId ?? scopedTasks[0]?.projectId;
@@ -289,7 +297,7 @@ export function RegisterProgressPanel({
         onOpenChange(next);
       }}
       title="Registrar avance"
-      description="Describe el trabajo, adjunta evidencia y guarda. La sincronización con Notion no borra lo guardado en Quantia."
+      description={sheetSubtitle}
       triggerRef={triggerRef}
       footer={
         saved ? (
@@ -299,14 +307,6 @@ export function RegisterProgressPanel({
         ) : (
           <>
             <Button
-              intent="secondary"
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => onOpenChange(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
               intent="primary"
               type="submit"
               form={formId}
@@ -314,6 +314,14 @@ export function RegisterProgressPanel({
               disabled={isSubmitting}
             >
               Guardar avance
+            </Button>
+            <Button
+              intent="secondary"
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
             </Button>
           </>
         )
@@ -342,6 +350,7 @@ export function RegisterProgressPanel({
             error={errors.title}
             maxLength={300}
             autoComplete="off"
+            placeholder="Ej.: Muestreo de octubre completado"
           />
           <TextArea
             label="Descripción"
@@ -351,10 +360,11 @@ export function RegisterProgressPanel({
             error={errors.description}
             maxLength={10_000}
             rows={5}
+            placeholder="Describe lo realizado y el resultado obtenido"
           />
           {taskSelectOptions.length > 0 ? (
             <Select
-              label={fixedProjectId ? "Tarea (opcional)" : "Tarea"}
+              label={fixedProjectId ? "Tarea vinculada (opcional)" : "Tarea vinculada"}
               required={!fixedProjectId}
               options={taskSelectOptions}
               value={taskId || undefined}
@@ -364,16 +374,17 @@ export function RegisterProgressPanel({
             />
           ) : null}
           <TextField
-            label="Enlace de evidencia"
-            description="URL http(s) opcional. Los archivos se adjuntan aparte."
+            label="Enlace de evidencia (opcional)"
+            description="Los enlaces son distintos de la carga de un documento."
             value={evidenceLink}
             onChange={(event) => setEvidenceLink(event.target.value)}
             error={errors.evidenceLink}
             inputMode="url"
             autoComplete="off"
+            placeholder="https://…"
           />
           <FileUploader
-            label="Adjuntar documento"
+            label="Documento (carga separada)"
             accept={DOCUMENT_ACCEPT}
             maxBytes={DOCUMENT_MAX_BYTES}
             files={uploads}
