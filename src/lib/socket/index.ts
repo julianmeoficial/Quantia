@@ -11,6 +11,11 @@ export {
 } from "./connection";
 export type { SocketNamespace } from "./connection";
 export { parseRealtimePayload } from "./events";
+export { parseChatGeneralPayload } from "./chatEvents";
+export type { ChatGeneralPayloadByEvent } from "./chatEvents";
+export { removePresenceUser, replacePresenceUsers, upsertPresenceUser } from "./presenceMap";
+export { resumeGeneralSocket, useGeneralSocket } from "./useGeneralSocket";
+export type { GeneralSocketState, UseGeneralSocketOptions } from "./useGeneralSocket";
 export {
   SocketProvider,
   budgetLowCopy,

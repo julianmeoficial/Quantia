@@ -69,19 +69,25 @@ Logout clears access token, drafts (unless expired-session keep), session report
 | [`connection.ts`](../../src/lib/socket/connection.ts)             | `io(NEXT_PUBLIC_SOCKET_URL + namespace)`, JWT in `auth.token`, budget / reconnect |
 | [`SocketProvider.tsx`](../../src/lib/socket/SocketProvider.tsx)   | Shell `/notifications`; connection state for header; session notices              |
 | [`useProjectSocket.ts`](../../src/lib/socket/useProjectSocket.ts) | `/projects` while a project view is mounted; `join` + contract events             |
-| [`events.ts`](../../src/lib/socket/events.ts)                     | Zod-validated contract payloads                                                   |
+| [`useGeneralSocket.ts`](../../src/lib/socket/useGeneralSocket.ts) | `/general` while `/chat` is mounted; presence + `mensaje-creado`                  |
+| [`events.ts`](../../src/lib/socket/events.ts)                     | Zod-validated contract payloads (project + chat general)                          |
 
 **Namespaces**
 
-| NS               | When connected                    |
-| ---------------- | --------------------------------- |
-| `/notifications` | Authenticated shell               |
-| `/projects`      | Project workspace mounted         |
-| `/general`       | Chat General mounted (when built) |
+| NS               | When connected                 |
+| ---------------- | ------------------------------ |
+| `/notifications` | Authenticated shell            |
+| `/projects`      | Project workspace mounted      |
+| `/general`       | Chat General (`/chat`) mounted |
 
 Server budget: **5** simultaneous connections per user across tabs/namespaces. Exceeding → pause realtime in this tab (`connectionPaused`); REST continues.
 
-**Contract realtime events (v0.7.0 only):** `tarea.actualizada`, `avance.registrado`, `proyecto.retrasado`, `presupuesto.ejecucion-baja`. Events invalidate/patch React Query; they are not the source of truth. After reconnect: re-join + refetch.
+**Contract realtime events (v0.7.0):**
+
+- Projects / notifications: `tarea.actualizada`, `avance.registrado`, `proyecto.retrasado`, `presupuesto.ejecucion-baja`.
+- Chat General (`/general`): `chat.general.presencia`, `chat.general.usuario-conectado`, `chat.general.usuario-desconectado`, `chat.general.mensaje-creado`. Room `general` is joined automatically by the server (no client `join`).
+
+Events invalidate/patch React Query; they are not the source of truth. After reconnect: re-join (projects) or refetch (chat history) + presence snapshot.
 
 **UI:** [`ConnectionStatus`](../../src/components/system/ConnectionStatus/ConnectionStatus.tsx) in `AppHeader` (`aria-live="polite"`). Hidden when `connected`. Copy: «Datos posiblemente desactualizados» / «Reconectando…».
 

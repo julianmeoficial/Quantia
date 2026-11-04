@@ -7,6 +7,7 @@ export {
   listGeneralChatMessages,
 } from "./chat";
 export type { CreateGeneralChatMessageResponse } from "./chat";
+export { insertChatMessageInCache } from "./chatCache";
 export {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,

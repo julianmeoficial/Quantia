@@ -47,7 +47,7 @@ src/
 └─ lib/
    ├─ api/                       # client.ts, errors.ts, errorUi.ts, query-keys.ts, sync.ts, one file per domain
    ├─ auth/                      # permissions.ts, returnPath.ts
-   ├─ socket/                    # connection.ts, events.ts, SocketProvider.tsx, useProjectSocket.ts
+   ├─ socket/                    # connection.ts, events.ts, SocketProvider, useProjectSocket, useGeneralSocket
    ├─ query/                     # QueryProvider + shared QueryClient
    └─ format/                    # currency.ts (COP), date.ts (DD/MM/AAAA, toApiDate), percent.ts
 ```
