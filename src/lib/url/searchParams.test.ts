@@ -36,6 +36,8 @@ describe("fromSearchParams", () => {
     expect(fromSearchParams(params, dashboardFiltersSchema, DASHBOARD_FILTER_DEFAULTS)).toEqual({
       q: "sensores",
       status: "ACTIVE",
+      page: 1,
+      pageSize: 20,
     });
   });
 

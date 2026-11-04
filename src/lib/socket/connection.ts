@@ -5,7 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import { env } from "@/config/env";
 import { getAccessToken } from "@/lib/api/session";
 
-export type SocketNamespace = "/projects" | "/notifications";
+export type SocketNamespace = "/projects" | "/notifications" | "/general";
 
 const sockets = new Map<SocketNamespace, Socket>();
 

@@ -19,6 +19,21 @@ export const Item = styled.li`
   border: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
   border-radius: ${({ theme }) => theme.radii.control};
+  transition:
+    background-color ${({ theme }) => theme.motion.duration.base}
+      ${({ theme }) => theme.motion.easing.standard},
+    box-shadow ${({ theme }) => theme.motion.duration.base}
+      ${({ theme }) => theme.motion.easing.standard};
+
+  &[data-highlighted="true"] {
+    background: ${({ theme }) => theme.colors.status.warning.bg};
+    box-shadow: inset 0 0 0 ${({ theme }) => theme.borderWidths.thin}
+      ${({ theme }) => theme.colors.status.warning.text};
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 export const Title = styled.p`

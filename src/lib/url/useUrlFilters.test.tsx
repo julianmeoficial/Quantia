@@ -33,7 +33,12 @@ describe("useUrlFilters", () => {
         pathname: "/dashboard",
       }),
     );
-    expect(result.current.values).toEqual({ q: "lab", status: "DELAYED" });
+    expect(result.current.values).toEqual({
+      q: "lab",
+      status: "DELAYED",
+      page: 1,
+      pageSize: 20,
+    });
     expect(result.current.isFiltered).toBe(true);
   });
 

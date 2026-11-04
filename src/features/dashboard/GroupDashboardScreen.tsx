@@ -1,7 +1,11 @@
 "use client";
 
-import type { ProjectResponse, UserResponse } from "@quantia/contracts";
-import { useEffect, useMemo, useState } from "react";
+import type {
+  PresupuestoEjecucionBajaPayload,
+  ProjectResponse,
+  UserResponse,
+} from "@quantia/contracts";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Badge, Button, Link, PROJECT_STATUS_PRESENTATION, Select } from "@/components/base";
@@ -10,6 +14,8 @@ import {
   AlertList,
   DataTable,
   KpiPanel,
+  ProgressChart,
+  type AlertListItem,
   type DataTableColumn,
   type KpiMetric,
 } from "@/components/page";
@@ -22,14 +28,17 @@ import {
   dashboardFiltersSchema,
   statusChipLabel,
 } from "@/features/filters";
-import { canAccess } from "@/lib/auth";
+import { canAccess, canViewBudgetDetail } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { useBudgetLowExecutionAlerts } from "@/lib/socket";
 import { useUrlFilters } from "@/lib/url";
 
 import * as S from "./GroupDashboardScreen.styles";
 import { useGroupDashboard } from "./useGroupDashboard";
+
+const HIGHLIGHT_MS = 2000;
 
 function coordinatorLabel(project: ProjectResponse, me: UserResponse | null): string {
   if (me && project.coordinatorId === me.id) return me.fullName;
@@ -106,6 +115,17 @@ function buildColumns(me: UserResponse | null): DataTableColumn<ProjectResponse>
   ];
 }
 
+function budgetLowAlert(payload: PresupuestoEjecucionBajaPayload): AlertListItem {
+  return {
+    id: `budget-low:${payload.projectId}:${payload.updatedAt}`,
+    severity: "critical",
+    title: "Ejecución presupuestal baja relativa al umbral",
+    interpretation: `Ejecución ${formatPercent(payload.executedPercent)} frente a umbral ${formatPercent(payload.thresholdPercent)}.`,
+    href: `/proyectos/${payload.projectId}`,
+    hrefLabel: "Revisar riesgo",
+  };
+}
+
 export function GroupDashboardScreen() {
   const router = useRouter();
   const { identity, user } = useAuth();
@@ -114,6 +134,7 @@ export function GroupDashboardScreen() {
     schema: dashboardFiltersSchema,
     defaults: DASHBOARD_FILTER_DEFAULTS,
     pathname: "/dashboard",
+    ignoreFilteredKeys: ["page"],
   });
 
   const [draftQ, setDraftQ] = useState(values.q);
@@ -128,12 +149,44 @@ export function GroupDashboardScreen() {
   useEffect(() => {
     const next = debouncedQ.trim();
     if (next !== values.q) {
-      setFilters({ q: next });
+      setFilters({ q: next, page: 1 });
     }
   }, [debouncedQ, setFilters, values.q]);
 
-  const query = useMemo(() => ({ q: values.q, status: values.status }), [values.q, values.status]);
+  const query = useMemo(
+    () => ({
+      q: values.q,
+      status: values.status,
+      page: values.page,
+      pageSize: values.pageSize,
+    }),
+    [values.page, values.pageSize, values.q, values.status],
+  );
   const { status, data, error, stale, reload } = useGroupDashboard(query);
+
+  const [liveAlerts, setLiveAlerts] = useState<AlertListItem[]>([]);
+  const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
+
+  const onBudgetLow = useCallback(
+    (payload: PresupuestoEjecucionBajaPayload) => {
+      if (!user || !canViewBudgetDetail(user)) return;
+      const alert = budgetLowAlert(payload);
+      setLiveAlerts((prev) => {
+        const without = prev.filter(
+          (item) => !item.id.startsWith(`budget-low:${payload.projectId}:`),
+        );
+        return [alert, ...without];
+      });
+      setHighlightedIds((prev) => [...prev.filter((id) => id !== alert.id), alert.id]);
+      window.setTimeout(() => {
+        setHighlightedIds((prev) => prev.filter((id) => id !== alert.id));
+      }, HIGHLIGHT_MS);
+      reload();
+    },
+    [reload, user],
+  );
+
+  useBudgetLowExecutionAlerts(onBudgetLow);
 
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/dashboard", roles);
@@ -148,14 +201,23 @@ export function GroupDashboardScreen() {
     return next;
   }, [values.q, values.status]);
 
+  const mergedAlerts = useMemo(() => {
+    const base = data?.alerts ?? [];
+    const byId = new Map<string, AlertListItem>();
+    for (const item of [...liveAlerts, ...base]) {
+      if (!byId.has(item.id)) byId.set(item.id, item);
+    }
+    return Array.from(byId.values());
+  }, [data?.alerts, liveAlerts]);
+
   const handleRemoveChip = (id: string) => {
     if (id === "q") {
       setDraftQ("");
-      setFilters({ q: "" });
+      setFilters({ q: "", page: 1 });
       return;
     }
     if (id === "status") {
-      setFilters({ status: ALL_STATUSES });
+      setFilters({ status: ALL_STATUSES, page: 1 });
     }
   };
 
@@ -256,7 +318,10 @@ export function GroupDashboardScreen() {
           value={values.status}
           onValueChange={(value) => {
             const option = PROJECT_STATUS_FILTER_OPTIONS.find((item) => item.value === value);
-            setFilters({ status: option ? (option.value as typeof values.status) : ALL_STATUSES });
+            setFilters({
+              status: option ? (option.value as typeof values.status) : ALL_STATUSES,
+              page: 1,
+            });
           }}
         />
       </FilterBar>
@@ -284,7 +349,8 @@ export function GroupDashboardScreen() {
           <S.Section aria-labelledby="dashboard-alerts">
             <S.SectionTitle id="dashboard-alerts">¿Qué necesita atención hoy?</S.SectionTitle>
             <AlertList
-              items={noFilteredProjects ? [] : data.alerts}
+              items={noFilteredProjects ? [] : mergedAlerts}
+              highlightedIds={highlightedIds}
               emptyTitle={noFilteredProjects ? "Sin resultados con estos filtros" : "Todo al día"}
               emptyDescription={
                 noFilteredProjects
@@ -294,45 +360,77 @@ export function GroupDashboardScreen() {
             />
           </S.Section>
 
-          <S.Section aria-labelledby="dashboard-comparison">
-            <S.SectionTitle id="dashboard-comparison">Comparación con contexto</S.SectionTitle>
-            {data.comparison && !noFilteredProjects ? (
+          <S.Section aria-labelledby="dashboard-charts">
+            <S.SectionTitle id="dashboard-charts">¿Dónde está la desviación?</S.SectionTitle>
+            {noFilteredProjects ? (
               <S.ComparisonCard>
-                <S.ComparisonTitle>
-                  {data.comparison.projectTitle} · mismo periodo disponible
-                </S.ComparisonTitle>
-                <S.MetricRow>
-                  <S.MetricLabelRow>
-                    <S.MetricLabel>Avance de investigación</S.MetricLabel>
-                    <S.MetricValue>{formatPercent(data.comparison.progressPercent)}</S.MetricValue>
-                  </S.MetricLabelRow>
-                  <S.Track>
-                    <S.Fill $tone="primary" $percent={data.comparison.progressPercent} />
-                  </S.Track>
-                </S.MetricRow>
-                <S.MetricRow>
-                  <S.MetricLabelRow>
-                    <S.MetricLabel>Presupuesto ejecutado</S.MetricLabel>
-                    <S.MetricValue>{formatPercent(data.comparison.executedPercent)}</S.MetricValue>
-                  </S.MetricLabelRow>
-                  <S.Track>
-                    <S.Fill $tone="warning" $percent={data.comparison.executedPercent} />
-                  </S.Track>
-                </S.MetricRow>
-                <S.Footnote>
-                  Comparación con medidas reales del proyecto. Nunca se sustituye un dato ausente
-                  por cero.
-                </S.Footnote>
-                <Link href={`/proyectos/${data.comparison.projectId}`}>Ver proyecto</Link>
+                <S.Footnote>Sin gráficas con los filtros actuales.</S.Footnote>
               </S.ComparisonCard>
             ) : (
-              <S.ComparisonCard>
-                <S.Footnote>
-                  {noFilteredProjects
-                    ? "Sin comparación disponible con los filtros actuales."
-                    : "En producción, esta comparación solo aparece con medidas comparables y un contrato disponible. Nunca se sustituye un dato ausente por cero."}
-                </S.Footnote>
-              </S.ComparisonCard>
+              <>
+                {data.charts.progressPoints.length > 0 ? (
+                  <ProgressChart
+                    title="Avance por proyecto (%)"
+                    period="Medidas reales de la página actual"
+                    series={[{ id: "progress", name: "Avance" }]}
+                    points={data.charts.progressPoints}
+                  />
+                ) : (
+                  <S.ComparisonCard>
+                    <S.Footnote>
+                      Aún no hay avance medible en los proyectos de esta página. No se muestran
+                      ceros inventados.
+                    </S.Footnote>
+                  </S.ComparisonCard>
+                )}
+
+                {data.charts.comparisonPoints.length > 0 ? (
+                  <ProgressChart
+                    title="Ejecución vs. avance"
+                    period="Solo proyectos con ambas medidas"
+                    series={[
+                      { id: "progress", name: "Avance" },
+                      { id: "executed", name: "Ejecución" },
+                    ]}
+                    points={data.charts.comparisonPoints}
+                  />
+                ) : null}
+
+                {data.comparison ? (
+                  <S.ComparisonCard>
+                    <S.ComparisonTitle>
+                      {data.comparison.projectTitle} · mismo periodo disponible
+                    </S.ComparisonTitle>
+                    <S.MetricRow>
+                      <S.MetricLabelRow>
+                        <S.MetricLabel>Avance de investigación</S.MetricLabel>
+                        <S.MetricValue>
+                          {formatPercent(data.comparison.progressPercent)}
+                        </S.MetricValue>
+                      </S.MetricLabelRow>
+                      <S.Track>
+                        <S.Fill $tone="primary" $percent={data.comparison.progressPercent} />
+                      </S.Track>
+                    </S.MetricRow>
+                    <S.MetricRow>
+                      <S.MetricLabelRow>
+                        <S.MetricLabel>Presupuesto ejecutado</S.MetricLabel>
+                        <S.MetricValue>
+                          {formatPercent(data.comparison.executedPercent)}
+                        </S.MetricValue>
+                      </S.MetricLabelRow>
+                      <S.Track>
+                        <S.Fill $tone="warning" $percent={data.comparison.executedPercent} />
+                      </S.Track>
+                    </S.MetricRow>
+                    <S.Footnote>
+                      Comparación con medidas reales del proyecto. Nunca se sustituye un dato
+                      ausente por cero.
+                    </S.Footnote>
+                    <Link href={`/proyectos/${data.comparison.projectId}`}>Ver proyecto</Link>
+                  </S.ComparisonCard>
+                ) : null}
+              </>
             )}
           </S.Section>
 
@@ -348,6 +446,17 @@ export function GroupDashboardScreen() {
               getRowId={(row) => row.id}
               isLoading={status === "loading"}
               emptyState={tableEmpty}
+              pagination={
+                data.totalProjects > 0
+                  ? {
+                      page: values.page,
+                      pageSize: values.pageSize,
+                      totalItems: data.totalProjects,
+                      onPageChange: (page) => setFilters({ page }),
+                      onPageSizeChange: (pageSize) => setFilters({ page: 1, pageSize }),
+                    }
+                  : undefined
+              }
             />
           </S.Section>
         </>

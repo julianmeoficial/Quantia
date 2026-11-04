@@ -19,6 +19,8 @@ const projectIdSchema = z.union([z.string().uuid(), z.literal("")]).default("");
 export const dashboardFiltersSchema = z.object({
   q: z.string().default(""),
   status: statusFilterSchema.default(ALL_STATUSES),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 export type DashboardFilters = z.infer<typeof dashboardFiltersSchema>;
@@ -26,6 +28,8 @@ export type DashboardFilters = z.infer<typeof dashboardFiltersSchema>;
 export const DASHBOARD_FILTER_DEFAULTS: DashboardFilters = {
   q: "",
   status: ALL_STATUSES,
+  page: 1,
+  pageSize: 20,
 };
 
 export const projectListFiltersSchema = z.object({

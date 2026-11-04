@@ -3,7 +3,9 @@
 import { ProjectStatus, type ProjectResponse } from "@quantia/contracts";
 import { useCallback, useEffect, useState } from "react";
 
+import type { ProgressPoint } from "@/components/page";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { ALL_STATUSES, type DashboardFilters } from "@/features/filters";
 import { getProjectBudget, listProjectTasks, listProjects } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
 import { canViewBudgetDetail } from "@/lib/auth";
@@ -14,7 +16,6 @@ import {
   type ProjectBudgetSnapshot,
   type ProjectProgressSnapshot,
 } from "./buildDashboardAlerts";
-import { ALL_STATUSES, type DashboardFilters } from "@/features/filters";
 
 export type DashboardKpis = {
   active: number;
@@ -30,12 +31,20 @@ export type ComparisonMeasures = {
   executedPercent: number;
 };
 
+export type DashboardChartBundle = {
+  progressPoints: ProgressPoint[];
+  comparisonPoints: ProgressPoint[];
+};
+
 export type GroupDashboardData = {
   kpis: DashboardKpis;
   projects: ProjectResponse[];
   totalProjects: number;
+  page: number;
+  pageSize: number;
   alerts: ReturnType<typeof buildDashboardAlerts>;
   comparison: ComparisonMeasures | null;
+  charts: DashboardChartBundle;
 };
 
 export type GroupDashboardStatus = "idle" | "loading" | "ready" | "error";
@@ -60,7 +69,15 @@ const INITIAL: Snapshot = { status: "idle", data: null, error: null, stale: fals
 export type GroupDashboardQuery = {
   q: string;
   status: DashboardFilters["status"];
+  page: number;
+  pageSize: number;
 };
+
+const CHART_SAMPLE = 8;
+
+function shortLabel(title: string): string {
+  return title.length > 28 ? `${title.slice(0, 27)}…` : title;
+}
 
 async function countByStatus(status: (typeof ProjectStatus)[keyof typeof ProjectStatus]) {
   const result = await listProjects({ page: 1, pageSize: 1, status });
@@ -127,8 +144,8 @@ export function useGroupDashboard(query: GroupDashboardQuery): UseGroupDashboard
           countByStatus(ProjectStatus.COMPLETED),
           countByStatus(ProjectStatus.FORMULATION),
           listProjects({
-            page: 1,
-            pageSize: 20,
+            page: query.page,
+            pageSize: query.pageSize,
             q: query.q || undefined,
             status: statusParam,
             sortBy: "status",
@@ -151,30 +168,32 @@ export function useGroupDashboard(query: GroupDashboardQuery): UseGroupDashboard
                 })
               ).data;
 
+        const chartProjects = list.data.slice(0, CHART_SAMPLE);
+        const measureTargets = Array.from(
+          new Map(
+            [...delayedProjects.slice(0, 4), ...chartProjects].map((project) => [
+              project.id,
+              project,
+            ]),
+          ).values(),
+        );
+
         const budgets: ProjectBudgetSnapshot[] = [];
         const progress: ProjectProgressSnapshot[] = [];
 
-        if (canViewBudgetDetail(user) && delayedProjects.length > 0) {
-          const sample = delayedProjects.slice(0, 4);
-          const pairs = await Promise.all(
-            sample.map(async (project) => {
-              const [budget, advance] = await Promise.all([
-                loadBudgetSafe(project.id),
-                loadProgressSafe(project.id),
-              ]);
-              return { project, budget, advance };
-            }),
-          );
-          for (const pair of pairs) {
-            if (pair.budget) budgets.push(pair.budget);
-            if (pair.advance) progress.push(pair.advance);
-          }
-        } else if (delayedProjects.length > 0) {
-          const sample = delayedProjects.slice(0, 4);
-          const advances = await Promise.all(sample.map((project) => loadProgressSafe(project.id)));
-          for (const item of advances) {
-            if (item) progress.push(item);
-          }
+        const pairs = await Promise.all(
+          measureTargets.map(async (project) => {
+            const [budget, advance] = await Promise.all([
+              canViewBudgetDetail(user) ? loadBudgetSafe(project.id) : Promise.resolve(null),
+              loadProgressSafe(project.id),
+            ]);
+            return { project, budget, advance };
+          }),
+        );
+
+        for (const pair of pairs) {
+          if (pair.budget) budgets.push(pair.budget);
+          if (pair.advance) progress.push(pair.advance);
         }
 
         if (cancelled) return;
@@ -196,14 +215,41 @@ export function useGroupDashboard(query: GroupDashboardQuery): UseGroupDashboard
           }
         }
 
+        const progressById = new Map(
+          progress.map((item) => [item.projectId, item.progressPercent]),
+        );
+        const budgetById = new Map(budgets.map((item) => [item.projectId, item.executedPercent]));
+
+        const progressPoints: ProgressPoint[] = [];
+        const comparisonPoints: ProgressPoint[] = [];
+        for (const project of chartProjects) {
+          const advance = progressById.get(project.id);
+          const executed = budgetById.get(project.id);
+          if (typeof advance === "number") {
+            progressPoints.push({
+              label: shortLabel(project.title),
+              values: { progress: advance },
+            });
+          }
+          if (typeof advance === "number" && typeof executed === "number") {
+            comparisonPoints.push({
+              label: shortLabel(project.title),
+              values: { progress: advance, executed },
+            });
+          }
+        }
+
         setSnapshot({
           status: "ready",
           data: {
             kpis: { active, delayed, completed, formulation },
             projects: list.data,
             totalProjects: list.meta.total,
+            page: list.meta.page,
+            pageSize: list.meta.pageSize,
             alerts,
             comparison,
+            charts: { progressPoints, comparisonPoints },
           },
           error: null,
           stale: false,
@@ -222,7 +268,7 @@ export function useGroupDashboard(query: GroupDashboardQuery): UseGroupDashboard
     return () => {
       cancelled = true;
     };
-  }, [authStatus, query.q, query.status, tick, user]);
+  }, [authStatus, query.page, query.pageSize, query.q, query.status, tick, user]);
 
   useEffect(() => {
     const onFocus = () => {
