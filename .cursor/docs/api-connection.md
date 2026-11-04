@@ -1,7 +1,7 @@
 # Frontend ↔ API connection (F3)
 
 Canonical path: `.cursor/docs/api-connection.md`.
-Status: DS-117 closed F3 (DS-119 Socket.io, DS-120 Notion sync retry, DS-121 async reports, DS-122 global errors + ConnectionStatus).
+Status: DS-117 closed F3 (DS-119 Socket.io, DS-120 Notion sync retry, DS-121 async reports, DS-122 global errors + ConnectionStatus). DS-118 closed Chat General UI (DS-123 cursor/idempotent send, DS-124 `/general` presence + live messages).
 Language: English documentation; Spanish user-facing copy.
 
 Related: `.cursorrules` · `AGENTS.md` · `.cursor/rules/api-integration.mdc` · `.cursor/docs/SCREENS.md` · `.cursor/docs/frontend-conventions.md`
@@ -93,6 +93,22 @@ Events invalidate/patch React Query; they are not the source of truth. After rec
 
 **Not in contract — do not subscribe:** `reporte.completado`, `sync.failed`.
 
+### Chat General (DS-118)
+
+Semillero-wide channel (not per project). Route: `/chat` → [`GeneralChatScreen`](../../src/features/chat-general/GeneralChatScreen.tsx) for all authenticated roles (`chatEnabled` in AppShell).
+
+| Layer         | Implementation                                                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST history  | `GET /chat/general/messages?cursor&limit` via [`lib/api/chat.ts`](../../src/lib/api/chat.ts); infinite query + Virtuoso (load older upward)        |
+| REST send     | `POST /chat/general/messages` with stable `clientMessageId`; optimistic `sending → sent → failed` + retry; 429 countdown on composer               |
+| Socket        | [`useGeneralSocket`](../../src/lib/socket/useGeneralSocket.ts) only while `/chat` is mounted; disconnect on unmount                                |
+| Presence      | `PresenceList` from `presencia` / connect / disconnect; rail on `md+`, Sheet on compact                                                            |
+| Live messages | Patch React Query on `mensaje-creado`; dedupe by `id` / `clientMessageId` ([`chatCache.ts`](../../src/lib/api/chatCache.ts) + `mergeChatMessages`) |
+| Scroll / a11y | No auto-scroll when reading history; pill «N mensajes nuevos»; polite live region for remote authors; composer keeps focus after send              |
+| Disabled chat | REST 404 → hide/unavailable ErrorState; no reconnect loop                                                                                          |
+
+UI states: Skeleton (first load), EmptyState «Aún no hay mensajes», sending/failed on `ChatMessage`, rate-limit on composer, reconnect via PresenceList `ConnectionStatus`.
+
 ## 5. React Query + live updates
 
 - Provider: [`src/lib/query/QueryProvider.tsx`](../../src/lib/query/QueryProvider.tsx).
@@ -175,7 +191,7 @@ Aligned with SCREENS §10 and `api-integration.mdc` §12:
 | Sync retry schemas         | `SyncEntityType` only; POST response not fully contracted | Provisional `POST /sync/:entityType/:id/retry` for admin (DS-120) |
 | Extra event payload fields | Not on realtime events                                    | Refetch resource                                                  |
 
-## 11. Verification gate (DS-117)
+## 11. Verification gate (DS-117 / DS-118)
 
 Automated on every F3-related PR:
 
@@ -183,4 +199,6 @@ Automated on every F3-related PR:
 npm run lint && npm run typecheck && npm run test && npm run build
 ```
 
-Key tests: `src/lib/socket/*`, `src/lib/api/sync.test.ts`, `src/features/reports/*`, `src/lib/api/errorUi.test.ts`, `src/lib/auth/returnPath.test.ts`, `ConnectionStatus` / `AppShell` tests.
+Key tests: `src/lib/socket/*` (incl. `chatEvents`, `presenceMap`), `src/lib/api/sync.test.ts`, `src/features/reports/*`, `src/lib/api/errorUi.test.ts`, `src/lib/auth/returnPath.test.ts`, `ConnectionStatus` / `AppShell` tests.
+
+Chat General (DS-118): `ChatMessage` / `MessageComposer` / `PresenceList` component tests; `mergeChatMessages` / `groupMessagesByDay` feature tests.
