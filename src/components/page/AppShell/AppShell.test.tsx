@@ -1,11 +1,15 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { ThemeProvider } from "styled-components";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { theme } from "@/theme";
 
 import { AppShell } from "./AppShell";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
 
 function renderWithTheme(ui: ReactElement) {
   return render(<ThemeProvider theme={theme}>{ui}</ThemeProvider>);
@@ -101,7 +105,8 @@ describe("AppShell", () => {
         <h1>Convocatoria</h1>
       </AppShell>,
     );
-    expect(screen.getByText("No tienes permiso para ver esta sección")).toBeInTheDocument();
+    expect(screen.getByText("No tienes acceso")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Volver" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Convocatoria" })).not.toBeInTheDocument();
   });
 
@@ -114,7 +119,8 @@ describe("AppShell", () => {
         <h1>Auditoría</h1>
       </AppShell>,
     );
-    expect(screen.getByText("No tienes permiso para ver esta sección")).toBeInTheDocument();
+    expect(screen.getByText("No tienes acceso")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Volver" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Auditoría" })).not.toBeInTheDocument();
   });
 
@@ -148,7 +154,8 @@ describe("AppShell", () => {
         <h1>Usuarios</h1>
       </AppShell>,
     );
-    expect(screen.getByText("No tienes permiso para ver esta sección")).toBeInTheDocument();
+    expect(screen.getByText("No tienes acceso")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Volver" })).toBeInTheDocument();
     expect(
       sections().queryByRole("link", { name: "Usuarios", hidden: true }),
     ).not.toBeInTheDocument();
@@ -167,5 +174,19 @@ describe("AppShell", () => {
       "#contenido",
     );
     expect(document.getElementById("contenido")?.tagName).toBe("MAIN");
+  });
+
+  it("surfaces ConnectionStatus in the header when the socket is down", () => {
+    renderWithTheme(
+      <AppShell
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        pathname="/mis-tareas"
+        connection="disconnected"
+        onReconnect={() => undefined}
+      />,
+    );
+    const banner = screen.getByRole("status");
+    expect(banner).toHaveAttribute("aria-live", "polite");
+    expect(banner).toHaveTextContent("Datos posiblemente desactualizados");
   });
 });

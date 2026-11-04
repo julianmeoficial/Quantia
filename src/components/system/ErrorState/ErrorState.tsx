@@ -34,7 +34,7 @@ const DEFAULTS: Record<
   { title: string; description: string; retryLabel: string }
 > = {
   forbidden: {
-    title: "No tienes permiso para ver esta sección",
+    title: "No tienes acceso",
     description: "Si crees que deberías tener acceso, pide ayuda a quien coordina tu proyecto.",
     retryLabel: "Volver",
   },

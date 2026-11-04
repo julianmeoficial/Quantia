@@ -1,12 +1,13 @@
 "use client";
 
 import { loginRequestSchema, type LoginRequest } from "@quantia/contracts";
-import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Button, TextField } from "@/components/base";
 import { ApiError } from "@/lib/api/errors";
-import { landing } from "@/lib/auth";
+import { useRateLimitLock } from "@/lib/async/useRateLimitLock";
+import { landing, postLoginHref } from "@/lib/auth";
 
 import { useAuth } from "./AuthProvider";
 import { NavBoot } from "./NavBoot";
@@ -45,6 +46,8 @@ function validate(email: string, password: string): FieldErrors {
 
 export function LoginScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from");
   const { status, user, login } = useAuth();
   const formErrorId = useId();
   const [email, setEmail] = useState("");
@@ -52,42 +55,24 @@ export function LoginScreen() {
   const [visible, setVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [lockId, setLockId] = useState(0);
-  const [retryAfter, setRetryAfter] = useState<number | null>(null);
-  const [remaining, setRemaining] = useState(0);
-  const [phase, setPhase] = useState<"idle" | "waiting" | "ready">("idle");
   const [isLoading, setIsLoading] = useState(false);
-  const remainingRef = useRef(0);
+  const rateLimit = useRateLimitLock();
 
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
-    const href = landing(user.roles);
+    const href = postLoginHref(from, user.roles, landing(user.roles));
     if (href) router.replace(href);
-  }, [status, user, router]);
-
-  useEffect(() => {
-    if (lockId === 0) return;
-    const id = window.setInterval(() => {
-      const next = remainingRef.current <= 1 ? 0 : remainingRef.current - 1;
-      remainingRef.current = next;
-      setRemaining(next);
-      if (next === 0) {
-        setPhase("ready");
-        window.clearInterval(id);
-      }
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [lockId]);
+  }, [status, user, router, from]);
 
   if (status === "booting" || (status === "authenticated" && user && landing(user.roles))) {
     return <NavBoot />;
   }
 
-  const locked = remaining > 0;
+  const locked = rateLimit.locked;
   const announcement =
-    phase === "waiting" && retryAfter !== null
-      ? `Demasiados intentos. Vuelve a intentarlo en ${retryAfter} segundos.`
-      : phase === "ready"
+    locked && rateLimit.retryAfter !== null
+      ? `Demasiados intentos. Vuelve a intentarlo en ${rateLimit.retryAfter} segundos.`
+      : rateLimit.justUnlocked
         ? "Ya puedes volver a intentarlo."
         : "";
 
@@ -108,7 +93,7 @@ export function LoginScreen() {
     setIsLoading(true);
     try {
       const me = await login(input);
-      const href = landing(me.roles);
+      const href = postLoginHref(from, me.roles, landing(me.roles));
       if (!href) {
         setFormError("No pudimos determinar tu acceso.");
         return;
@@ -116,12 +101,7 @@ export function LoginScreen() {
       router.replace(href);
     } catch (error) {
       if (error instanceof ApiError && error.kind === "rate_limited") {
-        const seconds = error.retryAfterSeconds ?? 5;
-        remainingRef.current = seconds;
-        setRemaining(seconds);
-        setRetryAfter(seconds);
-        setPhase("waiting");
-        setLockId((current) => current + 1);
+        rateLimit.start(error.retryAfterSeconds ?? 5);
         setFormError(null);
         return;
       }
@@ -190,7 +170,7 @@ export function LoginScreen() {
           <S.Submit type="submit" intent="primary" isLoading={isLoading} disabled={locked}>
             Inicia sesión de prueba
           </S.Submit>
-          {locked ? <S.RateLimit aria-hidden>{RATE_LIMIT(remaining)}</S.RateLimit> : null}
+          {locked ? <S.RateLimit aria-hidden>{RATE_LIMIT(rateLimit.remaining)}</S.RateLimit> : null}
           {formError ? (
             <S.FormError id={formErrorId} role="alert">
               {formError}

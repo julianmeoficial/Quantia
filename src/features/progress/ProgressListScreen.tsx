@@ -16,7 +16,7 @@ import {
 } from "@/features/filters";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
 import { useRetrySync } from "@/features/sync";
-import { listProjectTasks } from "@/lib/api";
+import { errorStatePropsFromApiError, listProjectTasks } from "@/lib/api";
 import { canAccess, canCreateProgress } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { useUrlFilters } from "@/lib/url";
@@ -168,28 +168,16 @@ function ProgressListBody() {
     );
   }
 
-  if (status === "error" && error?.kind === "forbidden") {
+  if (status === "error" && error) {
+    const ui = errorStatePropsFromApiError(error);
+    const goHome = ui.variant === "forbidden" || ui.variant === "not-found";
     return (
       <ErrorState
-        variant="forbidden"
-        onRetry={() => router.replace("/")}
-        retryLabel="Ir al inicio"
+        {...ui}
+        onRetry={goHome ? () => router.replace("/") : reload}
+        retryLabel={goHome ? "Ir al inicio" : undefined}
       />
     );
-  }
-
-  if (status === "error" && error?.kind === "rate_limited") {
-    return (
-      <ErrorState
-        variant="rate-limit"
-        retryAfterSeconds={error.retryAfterSeconds}
-        onRetry={reload}
-      />
-    );
-  }
-
-  if (status === "error") {
-    return <ErrorState variant="server" onRetry={reload} />;
   }
 
   const entries = data?.data ?? [];

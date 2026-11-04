@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import styled from "styled-components";
 
@@ -152,6 +153,7 @@ export function AppShell({
   onNoticesOpenChange,
   connectionPaused = false,
 }: AppShellProps) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
 
   if (!identity) {
@@ -212,7 +214,19 @@ export function AppShell({
           />
         ) : null}
         <Main id="contenido" tabIndex={-1}>
-          {denied ? <ErrorState variant="forbidden" /> : children}
+          {denied ? (
+            <ErrorState
+              variant="forbidden"
+              title="No tienes acceso"
+              onRetry={() => {
+                if (home) router.replace(home);
+                else router.replace("/");
+              }}
+              retryLabel="Volver"
+            />
+          ) : (
+            children
+          )}
         </Main>
       </Body>
       {sessionExpired ? (

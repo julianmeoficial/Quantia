@@ -31,6 +31,7 @@ import {
   startAuthChannel,
 } from "@/lib/auth/channel";
 import { clearSessionReports } from "@/features/reports/sessionReportsStore";
+import { buildLoginHref } from "@/lib/auth";
 import { clearDrafts } from "@/lib/auth/drafts";
 
 export type AuthStatus = "booting" | "authenticated" | "anonymous" | "sessionExpired";
@@ -41,7 +42,8 @@ interface AuthContextValue {
   identity: SessionIdentity | null;
   login: (input: LoginRequest) => Promise<UserResponse>;
   logout: () => Promise<void>;
-  endExpiredSession: () => Promise<void>;
+  /** Optional `from` restores the protected route after re-login. */
+  endExpiredSession: (from?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -204,12 +206,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     routerRef.current.replace("/login");
   }, [dropSession]);
 
-  const endExpiredSession = useCallback(async () => {
-    await logoutWithSession();
-    publishLogout(true);
-    dropSession({ keepDrafts: true });
-    routerRef.current.replace("/login");
-  }, [dropSession]);
+  const endExpiredSession = useCallback(
+    async (from?: string) => {
+      await logoutWithSession();
+      publishLogout(true);
+      dropSession({ keepDrafts: true });
+      routerRef.current.replace(from ? buildLoginHref(from) : "/login");
+    },
+    [dropSession],
+  );
 
   return (
     <AuthContext.Provider
