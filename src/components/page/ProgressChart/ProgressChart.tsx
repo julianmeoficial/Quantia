@@ -1,23 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
-import {
-  CartesianGrid,
-  LabelList,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { useTheme } from "styled-components";
+import styled from "styled-components";
 
 import { Button } from "@/components/base";
 import { formatPercent } from "@/lib/format";
 import { DataTable } from "@/components/page/DataTable";
 
-import styled from "styled-components";
+import type { ProgressPoint, ProgressSeries } from "./types";
+
+export type { ProgressPoint, ProgressSeries } from "./types";
+
+const ProgressChartPlot = dynamic(
+  () => import("./ProgressChartPlot").then((mod) => mod.ProgressChartPlot),
+  {
+    ssr: false,
+    loading: () => <PlotPlaceholder aria-busy="true" aria-label="Cargando gráfica" />,
+  },
+);
 
 const Figure = styled.figure`
   display: flex;
@@ -37,11 +38,6 @@ const Caption = styled.figcaption`
   font-weight: ${({ theme }) => theme.typography.bodyStrong.fontWeight};
 `;
 
-const Plot = styled.div`
-  width: 100%;
-  height: calc(${({ theme }) => theme.space[64]} * 4);
-`;
-
 const LegendList = styled.ul`
   display: flex;
   flex-wrap: wrap;
@@ -53,15 +49,12 @@ const LegendList = styled.ul`
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
 `;
 
-export interface ProgressSeries {
-  id: string;
-  name: string;
-}
-
-export interface ProgressPoint {
-  label: string;
-  values: Record<string, number>;
-}
+const PlotPlaceholder = styled.div`
+  width: 100%;
+  height: calc(${({ theme }) => theme.space[64]} * 4);
+  border-radius: ${({ theme }) => theme.radii.control};
+  background: ${({ theme }) => theme.colors.bg.subtle};
+`;
 
 export interface ProgressChartProps {
   title: string;
@@ -70,17 +63,8 @@ export interface ProgressChartProps {
   points: ProgressPoint[];
 }
 
-const DASH = [undefined, "6 4", "2 4"] as const;
-
 export function ProgressChart({ title, period, series, points }: ProgressChartProps) {
-  const theme = useTheme();
   const [asTable, setAsTable] = useState(false);
-  const strokes = [
-    theme.colors.brand.primary,
-    theme.colors.status.info.text,
-    theme.colors.status.success.text,
-  ];
-  const data = points.map((point) => ({ label: point.label, ...point.values }));
 
   return (
     <Figure>
@@ -114,30 +98,7 @@ export function ProgressChart({ title, period, series, points }: ProgressChartPr
           ]}
         />
       ) : (
-        <Plot>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke={theme.colors.border.subtle} />
-              <XAxis dataKey="label" stroke={theme.colors.text.secondary} />
-              <YAxis stroke={theme.colors.text.secondary} />
-              <Legend />
-              {series.map((item, index) => (
-                <Line
-                  key={item.id}
-                  type="monotone"
-                  dataKey={item.id}
-                  name={item.name}
-                  stroke={strokes[index % strokes.length]}
-                  strokeDasharray={DASH[index % DASH.length]}
-                  isAnimationActive={false}
-                  dot
-                >
-                  <LabelList dataKey={item.id} position="top" />
-                </Line>
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </Plot>
+        <ProgressChartPlot series={series} points={points} />
       )}
     </Figure>
   );

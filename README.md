@@ -31,14 +31,16 @@ npm run dev
 
 ## Scripts
 
-| Script                            | Descripción                        |
-| --------------------------------- | ---------------------------------- |
-| `npm run dev`                     | Servidor de desarrollo (Turbopack) |
-| `npm run build` / `npm start`     | Build y servidor de producción     |
-| `npm run lint` / `lint:fix`       | ESLint                             |
-| `npm run format` / `format:check` | Prettier                           |
-| `npm run typecheck`               | Verificación de tipos              |
-| `npm test` / `npm run test:watch` | Vitest + Testing Library           |
+| Script                            | Descripción                                             |
+| --------------------------------- | ------------------------------------------------------- |
+| `npm run dev`                     | Servidor de desarrollo (Turbopack)                      |
+| `npm run build` / `npm start`     | Build y servidor de producción                          |
+| `npm run lint` / `lint:fix`       | ESLint                                                  |
+| `npm run format` / `format:check` | Prettier                                                |
+| `npm run typecheck`               | Verificación de tipos                                   |
+| `npm test` / `npm run test:watch` | Vitest + Testing Library (+ axe en componentes)         |
+| `npm run test:a11y`               | Playwright + `@axe-core/playwright` (rutas principales) |
+| `npm run test:lighthouse`         | Lighthouse CI (a11y ≥ 95, perf ≥ 85, LCP ≤ 2,5 s)       |
 
 ## Estructura
 

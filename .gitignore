@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+/reports
+/playwright-report
+/test-results
+/.lighthouseci
+/blob-report
+/playwright/.cache
 
 # next.js
 /.next/
