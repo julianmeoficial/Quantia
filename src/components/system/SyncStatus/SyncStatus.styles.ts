@@ -13,10 +13,17 @@ export const Root = styled.div`
   line-height: ${({ theme }) => theme.typography.bodySmall.lineHeight};
 `;
 
-export const IconSlot = styled.span`
+export const IconSlot = styled.button`
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-size: ${({ theme }) => theme.typography.bodyMedium.fontSize};
   color: ${({ theme }) => theme.colors.text.secondary};
+  cursor: help;
 
   &[data-tone="success"] {
     color: ${({ theme }) => theme.colors.status.success.text};

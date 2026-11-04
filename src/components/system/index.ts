@@ -12,6 +12,6 @@ export type { SheetProps } from "./Sheet";
 export { Skeleton } from "./Skeleton";
 export type { SkeletonProps, SkeletonVariant } from "./Skeleton";
 export { SyncStatus } from "./SyncStatus";
-export type { SyncStatusProps, SyncStatusValue } from "./SyncStatus";
+export type { SyncStatusEntity, SyncStatusProps, SyncStatusValue } from "./SyncStatus";
 export { Toast, ToastProvider } from "./Toast";
 export type { ToastAction, ToastProps, ToastProviderProps } from "./Toast";

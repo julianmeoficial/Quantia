@@ -1,2 +1,2 @@
 export { SyncStatus } from "./SyncStatus";
-export type { SyncStatusProps, SyncStatusValue } from "./SyncStatus";
+export type { SyncStatusEntity, SyncStatusProps, SyncStatusValue } from "./SyncStatus";

@@ -58,6 +58,10 @@ export interface ActivityItem {
   evidenceLabel?: string;
   /** When set, renders SyncStatus for the entry (Notion sync). */
   syncStatus?: SyncStatusValue;
+  lastSyncedAt?: string;
+  canRetrySync?: boolean;
+  onRetrySync?: () => void;
+  isRetryingSync?: boolean;
 }
 
 export interface ActivityTimelineProps {
@@ -88,7 +92,17 @@ export function ActivityTimeline({
               </Text>
               <MetaRow>
                 <Time dateTime={item.at}>{formatDate(item.at, { withTime: true })}</Time>
-                {item.syncStatus ? <SyncStatus status={item.syncStatus} persisted /> : null}
+                {item.syncStatus ? (
+                  <SyncStatus
+                    status={item.syncStatus}
+                    persisted
+                    entity="progress"
+                    lastSyncedAt={item.lastSyncedAt}
+                    canRetry={Boolean(item.canRetrySync && item.syncStatus === "failed")}
+                    onRetry={item.onRetrySync}
+                    isLoading={item.isRetryingSync}
+                  />
+                ) : null}
               </MetaRow>
               {item.evidenceHref && item.evidenceLabel ? (
                 <Link href={item.evidenceHref} external>

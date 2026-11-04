@@ -1,8 +1,8 @@
 "use client";
 
-import type { ProgressResponse, UserResponse } from "@quantia/contracts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { SyncEntityType, type ProgressResponse, type UserResponse } from "@quantia/contracts";
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Select } from "@/components/base";
 import { FilterBar, type FilterChip } from "@/components/composite";
@@ -15,6 +15,7 @@ import {
   type ProgressListFilters,
 } from "@/features/filters";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
+import { useRetrySync } from "@/features/sync";
 import { listProjectTasks } from "@/lib/api";
 import { canAccess, canCreateProgress } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
@@ -29,21 +30,37 @@ function actorLabel(userId: string, me: UserResponse): string {
   return "Integrante del proyecto";
 }
 
-function toActivityItems(entries: ProgressResponse[], me: UserResponse): ActivityItem[] {
-  return entries.map((entry) => ({
-    id: entry.id,
-    at: entry.recordedAt,
-    actor: actorLabel(entry.authorId, me),
-    text: `${entry.title}: ${entry.description}`,
-    evidenceHref: entry.evidenceLinks[0],
-    evidenceLabel: entry.evidenceLinks[0] ? "Ver evidencia" : undefined,
-    syncStatus:
+function toActivityItems(
+  entries: ProgressResponse[],
+  me: UserResponse,
+  options: {
+    canRetry: boolean;
+    isRetrying: boolean;
+    retryingId: string | null;
+    onRetry: (entry: ProgressResponse) => void;
+  },
+): ActivityItem[] {
+  return entries.map((entry) => {
+    const syncStatus =
       entry.syncStatus === "PENDING"
-        ? "pending"
+        ? ("pending" as const)
         : entry.syncStatus === "FAILED"
-          ? "failed"
-          : "synced",
-  }));
+          ? ("failed" as const)
+          : ("synced" as const);
+    return {
+      id: entry.id,
+      at: entry.recordedAt,
+      actor: actorLabel(entry.authorId, me),
+      text: `${entry.title}: ${entry.description}`,
+      evidenceHref: entry.evidenceLinks[0],
+      evidenceLabel: entry.evidenceLinks[0] ? "Ver evidencia" : undefined,
+      syncStatus,
+      lastSyncedAt: entry.syncStatus === "SYNCED" ? entry.updatedAt : undefined,
+      canRetrySync: options.canRetry && syncStatus === "failed",
+      isRetryingSync: options.isRetrying && options.retryingId === entry.id,
+      onRetrySync: () => options.onRetry(entry),
+    };
+  });
 }
 
 export function ProgressListScreen() {
@@ -57,6 +74,8 @@ export function ProgressListScreen() {
 function ProgressListBody() {
   const router = useRouter();
   const { identity, user } = useAuth();
+  const { canRetry, isRetrying, retry } = useRetrySync();
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const registerTriggerRef = useRef<HTMLSpanElement>(null);
 
   const { values, setFilters } = useUrlFilters({
@@ -181,7 +200,31 @@ function ProgressListBody() {
           entry.description.toLowerCase().includes(localSearch.trim().toLowerCase()),
       )
     : entries;
-  const items = user ? toActivityItems(filtered, user) : [];
+  const items = user
+    ? toActivityItems(filtered, user, {
+        canRetry,
+        isRetrying,
+        retryingId,
+        onRetry: (entry) => {
+          setRetryingId(entry.id);
+          void retry({
+            entityType: SyncEntityType.PROGRESS,
+            id: entry.id,
+            projectId: entry.projectId,
+          }).then((ok) => {
+            setRetryingId(null);
+            if (ok) reload();
+            else {
+              setToast({
+                open: true,
+                title: "No se pudo reintentar la sincronización",
+                description: "Vuelve a intentarlo en unos segundos.",
+              });
+            }
+          });
+        },
+      })
+    : [];
   const isBootLoading =
     Boolean(values.projectId) && (status === "idle" || (status === "loading" && !data));
   const filterExtrasActive = Boolean(values.taskId);

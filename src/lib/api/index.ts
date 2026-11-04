@@ -22,6 +22,8 @@ export { createProjectProgress, getProjectProgress, listProjectProgress } from "
 export { createProject, deleteProject, getProject, listProjects, updateProject } from "./projects";
 export { queryKeys } from "./query-keys";
 export { createProjectReport, getProjectReport } from "./reports";
+export { retrySync } from "./sync";
+export type { RetryableSyncEntity } from "./sync";
 export {
   configureRefresh,
   expireSession,
