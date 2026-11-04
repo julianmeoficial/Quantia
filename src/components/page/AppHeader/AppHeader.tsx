@@ -8,6 +8,7 @@ import { Avatar, Link } from "@/components/base";
 import { focusRing } from "@/components/base/shared/focus";
 import { ConnectionStatus } from "@/components/system";
 import type { ConnectionState } from "@/components/system";
+import { formatDate } from "@/lib/format";
 
 const Header = styled.header`
   display: flex;
@@ -77,6 +78,8 @@ const AccountButton = styled.button`
 const Panel = styled(PopoverPrimitive.Content)`
   z-index: ${({ theme }) => theme.zIndices.overlay};
   width: calc(${({ theme }) => theme.layout.sidebar} + ${({ theme }) => theme.space[32]});
+  max-height: min(70vh, 28rem);
+  overflow: auto;
   padding: ${({ theme }) => theme.space[16]};
   background: ${({ theme }) => theme.colors.bg.surface};
   border: ${({ theme }) => theme.borderWidths.thin} solid
@@ -85,6 +88,58 @@ const Panel = styled(PopoverPrimitive.Content)`
   box-shadow: ${({ theme }) => theme.elevation.sm};
   color: ${({ theme }) => theme.colors.text.primary};
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
+`;
+
+const PanelTitle = styled.h2`
+  margin: 0 0 ${({ theme }) => theme.space[12]};
+  font-size: ${({ theme }) => theme.typography.label.fontSize};
+  font-weight: ${({ theme }) => theme.typography.label.fontWeight};
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const NoticeList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[12]};
+  margin: 0;
+  padding: 0;
+  list-style: none;
+`;
+
+const NoticeItem = styled.li`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+  padding-bottom: ${({ theme }) => theme.space[12]};
+  border-bottom: ${({ theme }) => theme.borderWidths.thin} solid
+    ${({ theme }) => theme.colors.border.subtle};
+
+  &:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+`;
+
+const NoticeTitle = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
+  font-weight: ${({ theme }) => theme.typography.label.fontWeight};
+`;
+
+const NoticeBody = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text.secondary};
+`;
+
+const NoticeTime = styled.time`
+  color: ${({ theme }) => theme.colors.text.secondary};
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
+`;
+
+const Empty = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
 const Menu = styled(DropdownMenuPrimitive.Content)`
@@ -117,6 +172,7 @@ const MenuItem = styled(DropdownMenuPrimitive.Item)`
 `;
 
 const NoticeButton = styled.button`
+  position: relative;
   min-height: ${({ theme }) => theme.sizes.control};
   padding: 0 ${({ theme }) => theme.space[12]};
   border: ${({ theme }) => theme.borderWidths.thin} solid
@@ -129,9 +185,45 @@ const NoticeButton = styled.button`
   ${focusRing}
 `;
 
+const CountBadge = styled.span`
+  position: absolute;
+  top: ${({ theme }) => theme.space[4]};
+  right: ${({ theme }) => theme.space[4]};
+  min-width: ${({ theme }) => theme.space[16]};
+  height: ${({ theme }) => theme.space[16]};
+  padding: 0 ${({ theme }) => theme.space[4]};
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ theme }) => theme.colors.status.error.text};
+  color: ${({ theme }) => theme.colors.brand.onPrimary};
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
+  line-height: ${({ theme }) => theme.space[16]};
+  text-align: center;
+`;
+
+const LiveRegion = styled.div`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+`;
+
 export interface AppHeaderCrumb {
   label: string;
   href?: string;
+}
+
+export interface AppHeaderNotice {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  href?: string;
+  hrefLabel?: string;
 }
 
 export interface AppHeaderProps {
@@ -142,6 +234,10 @@ export interface AppHeaderProps {
   roleLabel?: string;
   menu?: ReactNode;
   onLogout?: () => void;
+  notices?: AppHeaderNotice[];
+  unreadCount?: number;
+  onNoticesOpenChange?: (open: boolean) => void;
+  connectionPausedMessage?: string | null;
 }
 
 export function AppHeader({
@@ -152,7 +248,14 @@ export function AppHeader({
   roleLabel,
   menu,
   onLogout,
+  notices = [],
+  unreadCount = 0,
+  onNoticesOpenChange,
+  connectionPausedMessage = null,
 }: AppHeaderProps) {
+  const badgeLabel =
+    unreadCount > 0 ? `Avisos, ${unreadCount} sin revisar` : "Avisos de esta sesión";
+
   return (
     <Header>
       {menu}
@@ -175,15 +278,48 @@ export function AppHeader({
       <Tools>
         <StatusSlot>
           <ConnectionStatus state={connection} onReconnect={onReconnect} />
+          {connectionPausedMessage ? <Role role="status">{connectionPausedMessage}</Role> : null}
         </StatusSlot>
-        <PopoverPrimitive.Root>
+        <PopoverPrimitive.Root
+          onOpenChange={(open) => {
+            onNoticesOpenChange?.(open);
+          }}
+        >
           <PopoverPrimitive.Trigger asChild>
-            <NoticeButton type="button">Avisos</NoticeButton>
+            <NoticeButton type="button" aria-label={badgeLabel}>
+              Avisos
+              {unreadCount > 0 ? (
+                <CountBadge aria-hidden>{unreadCount > 9 ? "9+" : unreadCount}</CountBadge>
+              ) : null}
+            </NoticeButton>
           </PopoverPrimitive.Trigger>
           <PopoverPrimitive.Portal>
-            <Panel>Sin avisos en esta sesión.</Panel>
+            <Panel>
+              <PanelTitle>Avisos de esta sesión</PanelTitle>
+              {notices.length === 0 ? (
+                <Empty>Sin avisos en esta sesión.</Empty>
+              ) : (
+                <NoticeList>
+                  {notices.map((notice) => (
+                    <NoticeItem key={notice.id}>
+                      <NoticeTitle>{notice.title}</NoticeTitle>
+                      <NoticeBody>{notice.description}</NoticeBody>
+                      <NoticeTime dateTime={notice.createdAt}>
+                        {formatDate(notice.createdAt, { withTime: true })}
+                      </NoticeTime>
+                      {notice.href && notice.hrefLabel ? (
+                        <Link href={notice.href}>{notice.hrefLabel}</Link>
+                      ) : null}
+                    </NoticeItem>
+                  ))}
+                </NoticeList>
+              )}
+            </Panel>
           </PopoverPrimitive.Portal>
         </PopoverPrimitive.Root>
+        <LiveRegion aria-live="polite" aria-atomic="true">
+          {unreadCount > 0 ? `${unreadCount} avisos nuevos` : ""}
+        </LiveRegion>
         {roleLabel ? <Role>{roleLabel}</Role> : null}
         <DropdownMenuPrimitive.Root>
           <DropdownMenuPrimitive.Trigger asChild>

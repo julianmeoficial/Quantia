@@ -20,6 +20,7 @@ export {
 } from "./budget";
 export { createProjectProgress, getProjectProgress, listProjectProgress } from "./progress";
 export { createProject, deleteProject, getProject, listProjects, updateProject } from "./projects";
+export { queryKeys } from "./query-keys";
 export { createProjectReport, getProjectReport } from "./reports";
 export {
   configureRefresh,

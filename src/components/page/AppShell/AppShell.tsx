@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import styled from "styled-components";
 
 import { IconButton } from "@/components/base";
-import { AppHeader, type AppHeaderCrumb } from "@/components/page/AppHeader";
+import { AppHeader, type AppHeaderCrumb, type AppHeaderNotice } from "@/components/page/AppHeader";
 import { RoleSidebar } from "@/components/page/RoleSidebar";
 import { ErrorState } from "@/components/system";
 import type { ConnectionState } from "@/components/system";
@@ -132,6 +132,10 @@ export interface AppShellProps {
   onSessionAction?: () => void;
   /** Modal de sesión encima de la vista, sin desmontarla. */
   sessionExpired?: boolean;
+  notices?: AppHeaderNotice[];
+  unreadCount?: number;
+  onNoticesOpenChange?: (open: boolean) => void;
+  connectionPaused?: boolean;
 }
 
 export function AppShell({
@@ -143,6 +147,10 @@ export function AppShell({
   onLogout,
   onSessionAction,
   sessionExpired = false,
+  notices = [],
+  unreadCount = 0,
+  onNoticesOpenChange,
+  connectionPaused = false,
 }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -175,6 +183,10 @@ export function AppShell({
         userName={identity.displayName}
         roleLabel={role ? ROLE_LABEL[role] : undefined}
         onLogout={onLogout}
+        notices={notices}
+        unreadCount={unreadCount}
+        onNoticesOpenChange={onNoticesOpenChange}
+        connectionPausedMessage={connectionPaused ? "Tiempo real pausado en esta pestaña" : null}
         menu={
           <MenuSlot>
             <IconButton

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ThemeProvider } from "styled-components";
 
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import { QueryProvider } from "@/lib/query/QueryProvider";
 import { SocketProvider } from "@/lib/socket";
 import { StyledComponentsRegistry } from "@/lib/styled-registry";
 import { theme } from "@/theme";
@@ -17,7 +18,9 @@ export function Providers({ children }: { children: ReactNode }) {
         <GlobalStyle />
         <MotionConfig reducedMotion="user">
           <AuthProvider>
-            <SocketProvider>{children}</SocketProvider>
+            <QueryProvider>
+              <SocketProvider>{children}</SocketProvider>
+            </QueryProvider>
           </AuthProvider>
         </MotionConfig>
       </ThemeProvider>
