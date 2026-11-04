@@ -366,6 +366,17 @@ export function InstitutionalOverviewScreen() {
             />
           </S.Section>
 
+          <S.Section aria-labelledby="institutional-comparison">
+            <S.SectionTitle id="institutional-comparison">
+              ¿Dónde está la desviación?
+            </S.SectionTitle>
+            <EmptyState
+              kind="no-records"
+              title="Comparación no disponible"
+              description="No hay medidas agregadas fiables de avance frente a ejecución a escala institucional. No se inventan porcentajes ni gráficas."
+            />
+          </S.Section>
+
           <S.Section aria-labelledby="institutional-calls">
             <S.SectionTitle id="institutional-calls">Convocatorias</S.SectionTitle>
             {fixturesOn && callCards.length > 0 ? (

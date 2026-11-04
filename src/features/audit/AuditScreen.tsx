@@ -173,29 +173,51 @@ function AuditBody() {
             type="button"
             onClick={() => setExportKind(ReportKind.BUDGET_PDF)}
           >
-            Exportar PDF
+            Informe PDF de proyecto
           </Button>
           <Button
             intent="secondary"
             type="button"
             onClick={() => setExportKind(ReportKind.BUDGET_EXCEL)}
           >
-            Exportar Excel
+            Informe Excel de proyecto
           </Button>
         </S.HeaderActions>
       </S.Header>
 
       {!fixturesOn ? (
-        <EmptyState
-          kind="no-records"
-          title="Integración no disponible"
-          description="No hay contrato de auditoría en la API. No se inventan eventos ni historiales. Los botones de export usan reportes de proyecto (BUDGET_PDF / BUDGET_EXCEL)."
-        />
+        <>
+          <DemoBanner role="note">
+            Los filtros no están operativos: no hay contrato de auditoría en la API. Los botones de
+            informe generan BUDGET_PDF / BUDGET_EXCEL de un proyecto seleccionado — no un export
+            institucional (RF-17).
+          </DemoBanner>
+
+          <FilterBar searchLabel="Usuario" searchValue="" onSearchChange={() => undefined} disabled>
+            <TextField label="Acción" value="" disabled onChange={() => undefined} />
+            <TextField label="Entidad" value="" disabled onChange={() => undefined} />
+            <Select
+              label="Origen"
+              options={ORIGIN_OPTIONS}
+              value={ALL_ORIGINS}
+              onValueChange={() => undefined}
+              disabled
+            />
+            <TextField label="Rango de fechas" value="" disabled onChange={() => undefined} />
+          </FilterBar>
+
+          <EmptyState
+            kind="no-records"
+            title="Integración no disponible"
+            description="No hay contrato de auditoría en la API. No se inventan eventos ni historiales."
+          />
+        </>
       ) : (
         <>
           <DemoBanner role="note">
             Datos de demostración — sin contrato de auditoría. Solo visibles en desarrollo. Los
-            filtros operan sobre estas filas locales.
+            filtros operan sobre estas filas locales. Los informes PDF/Excel son de proyecto, no
+            institucionales.
           </DemoBanner>
 
           <FilterBar

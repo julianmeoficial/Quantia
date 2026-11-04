@@ -1,7 +1,14 @@
 import type { ProjectResponse, TaskResponse, UserResponse } from "@quantia/contracts";
 import { describe, expect, it } from "vitest";
 
-import { canCreateProgress, canDeleteDocument, canEditTask, canManageProject } from "./permissions";
+import {
+  canCreateProgress,
+  canDeleteDocument,
+  canEditTask,
+  canManageProject,
+  canManageUsers,
+  canViewAudit,
+} from "./permissions";
 
 const project: ProjectResponse = {
   id: "p1",
@@ -60,5 +67,19 @@ describe("project permissions", () => {
   it("allows progress for members", () => {
     expect(canCreateProgress(user("inv-1", ["INVESTIGADOR"]), project)).toBe(true);
     expect(canCreateProgress(user("stranger", ["INVESTIGADOR"]), project)).toBe(false);
+  });
+});
+
+describe("admin-only scopes", () => {
+  it("restricts user administration to Administrador", () => {
+    expect(canManageUsers(user("admin", ["ADMINISTRADOR"]))).toBe(true);
+    expect(canManageUsers(user("coord-1", ["COORDINADOR"]))).toBe(false);
+    expect(canManageUsers(user("inv-1", ["INVESTIGADOR"]))).toBe(false);
+  });
+
+  it("restricts audit view to Administrador", () => {
+    expect(canViewAudit(user("admin", ["ADMINISTRADOR"]))).toBe(true);
+    expect(canViewAudit(user("coord-1", ["COORDINADOR"]))).toBe(false);
+    expect(canViewAudit(user("inv-1", ["INVESTIGADOR"]))).toBe(false);
   });
 });

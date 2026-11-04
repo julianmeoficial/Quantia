@@ -23,6 +23,8 @@ export interface FilterBarProps {
   onClear?: () => void;
   resultCount?: number;
   isLoading?: boolean;
+  /** When true, search and clear stay non-interactive (shell for blocked filters). */
+  disabled?: boolean;
   children?: ReactNode;
 }
 
@@ -36,16 +38,28 @@ export function FilterBar({
   onClear,
   resultCount,
   isLoading = false,
+  disabled = false,
   children,
 }: FilterBarProps) {
   return (
-    <S.Group role="group" aria-label={label} aria-busy={isLoading || undefined}>
+    <S.Group
+      role="group"
+      aria-label={label}
+      aria-busy={isLoading || undefined}
+      aria-disabled={disabled || undefined}
+    >
       <S.Controls>
         <S.SearchSlot>
-          <SearchField label={searchLabel} value={searchValue} onChange={onSearchChange} />
+          <SearchField
+            label={searchLabel}
+            value={searchValue}
+            onChange={onSearchChange}
+            disabled={disabled}
+            isLoading={isLoading}
+          />
         </S.SearchSlot>
         {children}
-        {onClear ? (
+        {onClear && !disabled ? (
           <Button intent="ghost" type="button" onClick={onClear}>
             Limpiar filtros
           </Button>
