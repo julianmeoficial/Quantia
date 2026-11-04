@@ -52,6 +52,7 @@ export function TaskRow({
       {canUpdate ? (
         <Checkbox
           label={`Marcar «${title}» como completa`}
+          labelVisuallyHidden
           checked={checked}
           onCheckedChange={(next) => onCheckedChange?.(next === true)}
         />

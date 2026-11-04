@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { SpinnerIcon } from "@/components/base/icons";
 import type { ButtonIntent, ControlSize } from "@/components/base/shared/types";
@@ -15,19 +15,23 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-export function Button({
-  intent = "primary",
-  size = "md",
-  isLoading = false,
-  leadingIcon,
-  disabled,
-  type = "button",
-  children,
-  onClick,
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    intent = "primary",
+    size = "md",
+    isLoading = false,
+    leadingIcon,
+    disabled,
+    type = "button",
+    children,
+    onClick,
+    ...rest
+  },
+  ref,
+) {
   return (
     <S.Root
+      ref={ref}
       type={type}
       $intent={intent}
       $size={size}
@@ -54,4 +58,4 @@ export function Button({
       ) : null}
     </S.Root>
   );
-}
+});

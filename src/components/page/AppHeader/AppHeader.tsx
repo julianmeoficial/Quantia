@@ -15,7 +15,10 @@ const Header = styled.header`
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: ${({ theme }) => theme.space[16]};
+  gap: ${({ theme }) => theme.space[12]};
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: ${({ theme }) => theme.layout.header};
   padding: 0 ${({ theme }) => theme.space[16]};
   background: ${({ theme }) => theme.colors.bg.surface};
@@ -41,24 +44,29 @@ const Current = styled.span`
 
 const Tools = styled.div`
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: ${({ theme }) => theme.space[12]};
+  gap: ${({ theme }) => theme.space[8]};
   min-width: 0;
+  max-width: 100%;
 `;
 
 const StatusSlot = styled.div`
+  flex: 1 1 ${({ theme }) => `calc(${theme.space[64]} * 2)`};
   min-width: 0;
-
-  & > * {
-    width: auto;
-  }
+  max-width: 100%;
 `;
 
 const Role = styled.span`
+  display: none;
   color: ${({ theme }) => theme.colors.text.secondary};
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: inline;
+  }
 `;
 
 const AccountButton = styled.button`

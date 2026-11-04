@@ -10,10 +10,11 @@ const fadeIn = keyframes`
 `;
 
 export const Page = styled.div`
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: ${({ theme }) => theme.space[24]};
   width: 100%;
+  min-width: 0;
   max-width: ${({ theme }) => theme.sizes.containerMax};
 `;
 

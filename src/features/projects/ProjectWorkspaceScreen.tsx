@@ -155,8 +155,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
-  const registerTriggerRef = useRef<HTMLSpanElement>(null);
-  const manageTaskTriggerRef = useRef<HTMLSpanElement>(null);
+  const registerTriggerRef = useRef<HTMLButtonElement>(null);
+  const manageTaskTriggerRef = useRef<HTMLButtonElement>(null);
   const [editTaskOpen, setEditTaskOpen] = useState(false);
   const [editFocus, setEditFocus] = useState<"assignee" | "dueDate">("dueDate");
   const [budget, setBudget] = useState<BudgetResponse | null>(null);
@@ -622,30 +622,32 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           </S.MetaRow>
         </S.HeaderText>
         <S.HeaderActions>
-          <span ref={manageTaskTriggerRef}>
-            <Button intent="primary" type="button" onClick={() => openEditTask("assignee")}>
-              Gestionar tarea
-            </Button>
-          </span>
-          <span ref={registerTriggerRef}>
-            <Button
-              intent="secondary"
-              type="button"
-              onClick={() => {
-                if (!allowProgress) {
-                  setToast({
-                    open: true,
-                    title: "No puedes registrar avance",
-                    description: "No tienes permiso para registrar avances en este proyecto.",
-                  });
-                  return;
-                }
-                setRegisterOpen(true);
-              }}
-            >
-              Registrar avance
-            </Button>
-          </span>
+          <Button
+            ref={manageTaskTriggerRef}
+            intent="primary"
+            type="button"
+            onClick={() => openEditTask("assignee")}
+          >
+            Gestionar tarea
+          </Button>
+          <Button
+            ref={registerTriggerRef}
+            intent="secondary"
+            type="button"
+            onClick={() => {
+              if (!allowProgress) {
+                setToast({
+                  open: true,
+                  title: "No puedes registrar avance",
+                  description: "No tienes permiso para registrar avances en este proyecto.",
+                });
+                return;
+              }
+              setRegisterOpen(true);
+            }}
+          >
+            Registrar avance
+          </Button>
         </S.HeaderActions>
       </S.Header>
 

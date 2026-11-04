@@ -58,7 +58,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div>
+    <S.Root>
       <S.Region role="region" tabIndex={0} aria-label={caption}>
         <S.Table>
           <S.Caption>{caption}</S.Caption>
@@ -121,6 +121,6 @@ export function DataTable<T>({
           <Pagination {...pagination} isLoading={false} />
         </S.Footer>
       ) : null}
-    </div>
+    </S.Root>
   );
 }

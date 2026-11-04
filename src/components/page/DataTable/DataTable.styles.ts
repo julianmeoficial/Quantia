@@ -3,9 +3,25 @@ import styled from "styled-components";
 import { focusRing } from "@/components/base/shared/focus";
 import { liveUpdateHighlight } from "@/components/system/highlight";
 
-export const Region = styled.div`
-  overflow: auto;
+/**
+ * Grid `minmax(0, 1fr)` prevents wide tables from inflating ancestors
+ * (block `width: 100%` alone still lets min-content blow out the page).
+ */
+export const Root = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+`;
+
+export const Region = styled.div`
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   border: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
   border-radius: ${({ theme }) => theme.radii.card};
@@ -13,7 +29,9 @@ export const Region = styled.div`
 `;
 
 export const Table = styled.table`
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
   border-collapse: collapse;
   background: ${({ theme }) => theme.colors.bg.surface};
 `;

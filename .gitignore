@@ -18,6 +18,8 @@
 /.lighthouseci
 /blob-report
 /playwright/.cache
+/e2e/responsive/captures/**
+!/e2e/responsive/captures/.gitkeep
 
 # next.js
 /.next/

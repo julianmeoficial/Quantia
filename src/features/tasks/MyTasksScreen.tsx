@@ -266,7 +266,7 @@ function MyTasksBody() {
     open: false,
     title: "",
   });
-  const registerTriggerRef = useRef<HTMLSpanElement>(null);
+  const registerTriggerRef = useRef<HTMLButtonElement>(null);
 
   const appliedProjectId = parseProjectFilter(searchParams.get("projectId"));
   const appliedStatus = parseStatusFilter(searchParams.get("status"));
@@ -388,11 +388,14 @@ function MyTasksBody() {
           </S.Subtitle>
         </S.HeaderText>
         <S.HeaderActions>
-          <span ref={registerTriggerRef}>
-            <Button intent="primary" type="button" onClick={() => openRegister()}>
-              Registrar avance
-            </Button>
-          </span>
+          <Button
+            ref={registerTriggerRef}
+            intent="primary"
+            type="button"
+            onClick={() => openRegister()}
+          >
+            Registrar avance
+          </Button>
         </S.HeaderActions>
       </S.Header>
 
