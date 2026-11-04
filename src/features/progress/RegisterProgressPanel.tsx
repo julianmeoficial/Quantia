@@ -10,9 +10,11 @@ import {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
   createProjectProgress,
+  getProjectProgress,
   uploadProjectDocument,
 } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
+import { pollWithBackoff } from "@/lib/async/pollWithBackoff";
 import { readDraft, saveDraft } from "@/lib/auth";
 
 import * as S from "./RegisterProgressPanel.styles";
@@ -128,6 +130,27 @@ export function RegisterProgressPanel({
     hydratedOpenRef.current = true;
     hydrate();
   }, [open, hydrate]);
+
+  const savedPending = saved?.syncStatus === "PENDING";
+  const savedProgressId = saved?.id;
+  const savedProjectId = saved?.projectId;
+
+  useEffect(() => {
+    if (!savedPending || !savedProgressId || !savedProjectId) return;
+
+    const controller = new AbortController();
+
+    void pollWithBackoff({
+      fetch: () => getProjectProgress(savedProjectId, savedProgressId),
+      isDone: (progress) => progress.syncStatus !== "PENDING",
+      signal: controller.signal,
+      onUpdate: setSaved,
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [savedPending, savedProgressId, savedProjectId]);
 
   const persistDraft = useCallback(
     (projectId: string) => {

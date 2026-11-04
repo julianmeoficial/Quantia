@@ -74,7 +74,7 @@ export const Content = styled(SelectPrimitive.Content)`
     ${({ theme }) => theme.colors.border.subtle};
   border-radius: ${({ theme }) => theme.radii.control};
   box-shadow: ${({ theme }) => theme.elevation.md};
-  z-index: ${({ theme }) => theme.zIndices.overlay};
+  z-index: ${({ theme }) => theme.zIndices.dropdown};
 `;
 
 export const Viewport = styled(SelectPrimitive.Viewport)`

@@ -40,3 +40,12 @@ export function createProjectProgress(
     schema: progressResponseSchema,
   });
 }
+
+export function getProjectProgress(
+  projectId: string,
+  progressId: string,
+): Promise<ProgressResponse> {
+  return api.get(`/projects/${projectId}/progress/${progressId}`, {
+    schema: progressResponseSchema,
+  });
+}

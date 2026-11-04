@@ -2,7 +2,7 @@ import styled from "styled-components";
 
 import { liveUpdateHighlight } from "@/components/system/highlight";
 
-export const Row = styled.li`
+export const Row = styled.div`
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;

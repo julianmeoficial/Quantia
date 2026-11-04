@@ -132,5 +132,7 @@ export const zIndices = {
   sticky: 100,
   overlay: 200,
   modal: 300,
+  /** Menus/selects portaled above Sheet/Dialog. */
+  dropdown: 350,
   toast: 400,
 } as const;
