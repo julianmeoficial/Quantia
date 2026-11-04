@@ -4,11 +4,9 @@ import type { PaginatedProjectsResponse, ProjectStatus } from "@quantia/contract
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/features/auth/AuthProvider";
+import { ALL_STATUSES, type ProjectListFilters } from "@/features/filters";
 import { listProjects } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
-
-import type { ProjectsStatusFilter } from "./projectsListFilters";
-import { ALL_STATUSES } from "./projectsListFilters";
 
 export type ProjectsListStatus = "idle" | "loading" | "ready" | "error";
 
@@ -29,12 +27,10 @@ type Snapshot = {
 
 const INITIAL: Snapshot = { status: "idle", data: null, error: null, stale: false };
 
-export type ProjectsListQuery = {
-  q: string;
-  status: ProjectsStatusFilter;
-  page: number;
-  pageSize: number;
-};
+export type ProjectsListQuery = Pick<
+  ProjectListFilters,
+  "q" | "status" | "page" | "pageSize" | "sortBy" | "sortOrder"
+>;
 
 export function useProjectsList(query: ProjectsListQuery): UseProjectsListState {
   const { status: authStatus } = useAuth();
@@ -68,8 +64,8 @@ export function useProjectsList(query: ProjectsListQuery): UseProjectsListState 
           pageSize: query.pageSize,
           q: query.q || undefined,
           status: statusParam,
-          sortBy: "title",
-          sortOrder: "asc",
+          sortBy: query.sortBy,
+          sortOrder: query.sortOrder,
         });
         if (cancelled) return;
         setSnapshot({ status: "ready", data: result, error: null, stale: false });
@@ -87,7 +83,16 @@ export function useProjectsList(query: ProjectsListQuery): UseProjectsListState 
     return () => {
       cancelled = true;
     };
-  }, [authStatus, query.page, query.pageSize, query.q, query.status, tick]);
+  }, [
+    authStatus,
+    query.page,
+    query.pageSize,
+    query.q,
+    query.sortBy,
+    query.sortOrder,
+    query.status,
+    tick,
+  ]);
 
   useEffect(() => {
     const onFocus = () => {

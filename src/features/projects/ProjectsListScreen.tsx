@@ -1,29 +1,32 @@
 "use client";
 
 import type { ProjectResponse, UserResponse } from "@quantia/contracts";
-import { useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge, Button, Link, PROJECT_STATUS_PRESENTATION, Select } from "@/components/base";
-import { SearchField } from "@/components/composite";
+import { FilterBar, type FilterChip } from "@/components/composite";
 import { DataTable, type DataTableColumn } from "@/components/page";
 import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
+import {
+  ALL_STATUSES,
+  PROJECT_LIST_FILTER_DEFAULTS,
+  PROJECT_SORT_OPTIONS,
+  PROJECT_STATUS_FILTER_OPTIONS,
+  projectListFiltersSchema,
+  sortChipLabel,
+  statusChipLabel,
+  type ProjectListFilters,
+} from "@/features/filters";
 import { canAccess, isAdmin, isCoordinator } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { useUrlFilters } from "@/lib/url";
 
 import { CreateProjectPanel } from "./CreateProjectPanel";
 import * as S from "./ProjectsListScreen.styles";
-import {
-  ALL_STATUSES,
-  PROJECT_STATUS_FILTER_OPTIONS,
-  parsePage,
-  parsePageSize,
-  parseSearchQuery,
-  parseStatusFilter,
-  type ProjectsStatusFilter,
-} from "./projectsListFilters";
 import { useProjectsList } from "./useProjectsList";
 
 function coordinatorLabel(project: ProjectResponse, me: UserResponse | null): string {
@@ -77,28 +80,44 @@ export function ProjectsListScreen() {
 
 function ProjectsListBody() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { identity, user } = useAuth();
   const createTriggerRef = useRef<HTMLSpanElement>(null);
 
-  const appliedQ = parseSearchQuery(searchParams.get("q"));
-  const appliedStatus = parseStatusFilter(searchParams.get("status"));
-  const appliedPage = parsePage(searchParams.get("page"));
-  const appliedPageSize = parsePageSize(searchParams.get("pageSize"));
+  const { values, setFilters, clearFilters, isFiltered } = useUrlFilters({
+    schema: projectListFiltersSchema,
+    defaults: PROJECT_LIST_FILTER_DEFAULTS,
+    pathname: "/proyectos",
+  });
+
+  const [draftQ, setDraftQ] = useState(values.q);
+  const [urlQ, setUrlQ] = useState(values.q);
+  if (values.q !== urlQ) {
+    setUrlQ(values.q);
+    setDraftQ(values.q);
+  }
+
+  const debouncedQ = useDebouncedValue(draftQ, 300);
+
+  useEffect(() => {
+    const next = debouncedQ.trim();
+    if (next !== values.q) {
+      setFilters({ q: next, page: 1 });
+    }
+  }, [debouncedQ, setFilters, values.q]);
 
   const query = useMemo(
     () => ({
-      q: appliedQ,
-      status: appliedStatus,
-      page: appliedPage,
-      pageSize: appliedPageSize,
+      q: values.q,
+      status: values.status,
+      page: values.page,
+      pageSize: values.pageSize,
+      sortBy: values.sortBy,
+      sortOrder: values.sortOrder,
     }),
-    [appliedPage, appliedPageSize, appliedQ, appliedStatus],
+    [values.page, values.pageSize, values.q, values.sortBy, values.sortOrder, values.status],
   );
 
   const { status, data, error, stale, reload } = useProjectsList(query);
-  const [draftQ, setDraftQ] = useState(appliedQ);
-  const [draftStatus, setDraftStatus] = useState<ProjectsStatusFilter>(appliedStatus);
   const [createOpen, setCreateOpen] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
@@ -108,26 +127,50 @@ function ProjectsListBody() {
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/proyectos", roles);
   const canCreate = Boolean(user && (isAdmin(user) || isCoordinator(user)));
-  const filtersActive = appliedQ !== "" || appliedStatus !== ALL_STATUSES;
   const columns = useMemo(() => buildColumns(user), [user]);
 
-  const writeParams = (next: {
-    q?: string;
-    status?: ProjectsStatusFilter;
-    page?: number;
-    pageSize?: number;
-  }) => {
-    const params = new URLSearchParams();
-    const q = next.q ?? appliedQ;
-    const statusFilter = next.status ?? appliedStatus;
-    const page = next.page ?? appliedPage;
-    const pageSize = next.pageSize ?? appliedPageSize;
-    if (q) params.set("q", q);
-    if (statusFilter !== ALL_STATUSES) params.set("status", statusFilter);
-    if (page > 1) params.set("page", String(page));
-    if (pageSize !== 20) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    router.replace(qs ? `/proyectos?${qs}` : "/proyectos");
+  const sortValue = `${values.sortBy}:${values.sortOrder}`;
+  const sortIsDefault =
+    values.sortBy === PROJECT_LIST_FILTER_DEFAULTS.sortBy &&
+    values.sortOrder === PROJECT_LIST_FILTER_DEFAULTS.sortOrder;
+
+  const chips = useMemo((): FilterChip[] => {
+    const next: FilterChip[] = [];
+    if (values.q) next.push({ id: "q", label: `Búsqueda: ${values.q}` });
+    if (values.status !== ALL_STATUSES) {
+      next.push({ id: "status", label: `Estado: ${statusChipLabel(values.status)}` });
+    }
+    if (!sortIsDefault) {
+      next.push({
+        id: "sort",
+        label: `Orden: ${sortChipLabel(values.sortBy, values.sortOrder)}`,
+      });
+    }
+    return next;
+  }, [sortIsDefault, values.q, values.sortBy, values.sortOrder, values.status]);
+
+  const handleRemoveChip = (id: string) => {
+    if (id === "q") {
+      setDraftQ("");
+      setFilters({ q: "", page: 1 });
+      return;
+    }
+    if (id === "status") {
+      setFilters({ status: ALL_STATUSES, page: 1 });
+      return;
+    }
+    if (id === "sort") {
+      setFilters({
+        sortBy: PROJECT_LIST_FILTER_DEFAULTS.sortBy,
+        sortOrder: PROJECT_LIST_FILTER_DEFAULTS.sortOrder,
+        page: 1,
+      });
+    }
+  };
+
+  const handleClear = () => {
+    setDraftQ("");
+    clearFilters();
   };
 
   if (!allowed) {
@@ -167,7 +210,6 @@ function ProjectsListBody() {
   const rows = data?.data ?? [];
   const total = data?.meta.total ?? 0;
   const isBootLoading = status === "idle" || (status === "loading" && !data);
-  const emptyKind = filtersActive ? "no-results" : "no-records";
 
   return (
     <S.Page>
@@ -187,49 +229,41 @@ function ProjectsListBody() {
         ) : null}
       </S.Header>
 
-      <S.FilterGrid>
-        <SearchField
-          label="Buscar proyecto"
-          value={draftQ}
-          onChange={setDraftQ}
-          placeholder="Ej.: Observatorio"
-        />
+      <FilterBar
+        searchLabel="Buscar proyecto"
+        searchValue={draftQ}
+        onSearchChange={setDraftQ}
+        chips={chips}
+        onRemoveChip={handleRemoveChip}
+        onClear={isFiltered ? handleClear : undefined}
+        resultCount={data?.meta.total}
+        isLoading={status === "loading"}
+      >
         <Select
           label="Estado"
           options={PROJECT_STATUS_FILTER_OPTIONS}
-          value={draftStatus}
-          onValueChange={(value) => setDraftStatus(parseStatusFilter(value))}
+          value={values.status}
+          onValueChange={(value) => {
+            const option = PROJECT_STATUS_FILTER_OPTIONS.find((item) => item.value === value);
+            setFilters({
+              status: option ? (option.value as ProjectListFilters["status"]) : ALL_STATUSES,
+              page: 1,
+            });
+          }}
         />
-        <S.FilterActions>
-          <Button
-            intent="secondary"
-            type="button"
-            onClick={() => {
-              setDraftQ(draftQ.trim());
-              writeParams({
-                q: draftQ.trim(),
-                status: draftStatus,
-                page: 1,
-              });
-            }}
-          >
-            Buscar
-          </Button>
-          {filtersActive ? (
-            <Button
-              intent="ghost"
-              type="button"
-              onClick={() => {
-                setDraftQ("");
-                setDraftStatus(ALL_STATUSES);
-                writeParams({ q: "", status: ALL_STATUSES, page: 1 });
-              }}
-            >
-              Limpiar filtros
-            </Button>
-          ) : null}
-        </S.FilterActions>
-      </S.FilterGrid>
+        <Select
+          label="Orden"
+          options={PROJECT_SORT_OPTIONS}
+          value={sortValue}
+          onValueChange={(value) => {
+            const [sortBy, sortOrder] = value.split(":") as [
+              ProjectListFilters["sortBy"],
+              ProjectListFilters["sortOrder"],
+            ];
+            setFilters({ sortBy, sortOrder, page: 1 });
+          }}
+        />
+      </FilterBar>
 
       {stale ? (
         <S.StaleBanner role="status">
@@ -251,24 +285,18 @@ function ProjectsListBody() {
           isLoading={status === "loading"}
           emptyState={
             <EmptyState
-              kind={emptyKind}
-              title="Sin proyectos en esta vista"
+              kind={isFiltered ? "no-results" : "no-records"}
+              title={
+                isFiltered ? "Sin resultados con estos filtros" : "Sin proyectos en esta vista"
+              }
               description={
-                filtersActive
+                isFiltered
                   ? "Prueba con otros filtros o limpia la búsqueda."
                   : "Cuando existan proyectos accesibles aparecerán aquí."
               }
               action={
-                filtersActive ? (
-                  <Button
-                    intent="secondary"
-                    type="button"
-                    onClick={() => {
-                      setDraftQ("");
-                      setDraftStatus(ALL_STATUSES);
-                      writeParams({ q: "", status: ALL_STATUSES, page: 1 });
-                    }}
-                  >
+                isFiltered ? (
+                  <Button intent="secondary" type="button" onClick={handleClear}>
                     Limpiar filtros
                   </Button>
                 ) : undefined
@@ -278,11 +306,11 @@ function ProjectsListBody() {
           pagination={
             total > 0
               ? {
-                  page: appliedPage,
-                  pageSize: appliedPageSize,
+                  page: values.page,
+                  pageSize: values.pageSize,
                   totalItems: total,
-                  onPageChange: (page) => writeParams({ page }),
-                  onPageSizeChange: (pageSize) => writeParams({ page: 1, pageSize }),
+                  onPageChange: (page) => setFilters({ page }),
+                  onPageSizeChange: (pageSize) => setFilters({ page: 1, pageSize }),
                 }
               : undefined
           }

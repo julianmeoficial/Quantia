@@ -14,8 +14,7 @@ import {
   type ProjectBudgetSnapshot,
   type ProjectProgressSnapshot,
 } from "./buildDashboardAlerts";
-import type { ProjectsStatusFilter } from "@/features/projects/projectsListFilters";
-import { ALL_STATUSES } from "@/features/projects/projectsListFilters";
+import { ALL_STATUSES, type DashboardFilters } from "@/features/filters";
 
 export type DashboardKpis = {
   active: number;
@@ -60,7 +59,7 @@ const INITIAL: Snapshot = { status: "idle", data: null, error: null, stale: fals
 
 export type GroupDashboardQuery = {
   q: string;
-  status: ProjectsStatusFilter;
+  status: DashboardFilters["status"];
 };
 
 async function countByStatus(status: (typeof ProjectStatus)[keyof typeof ProjectStatus]) {
