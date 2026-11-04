@@ -1,11 +1,11 @@
 "use client";
 
 import type { ProjectResponse, UserResponse } from "@quantia/contracts";
-import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge, Button, Link, PROJECT_STATUS_PRESENTATION, Select } from "@/components/base";
-import { SearchField } from "@/components/composite";
+import { FilterBar, type FilterChip } from "@/components/composite";
 import {
   AlertList,
   DataTable,
@@ -17,14 +17,16 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
 import {
   ALL_STATUSES,
+  DASHBOARD_FILTER_DEFAULTS,
   PROJECT_STATUS_FILTER_OPTIONS,
-  parseSearchQuery,
-  parseStatusFilter,
-  type ProjectsStatusFilter,
-} from "@/features/projects/projectsListFilters";
+  dashboardFiltersSchema,
+  statusChipLabel,
+} from "@/features/filters";
 import { canAccess } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate, formatPercent } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { useUrlFilters } from "@/lib/url";
 
 import * as S from "./GroupDashboardScreen.styles";
 import { useGroupDashboard } from "./useGroupDashboard";
@@ -106,29 +108,60 @@ function buildColumns(me: UserResponse | null): DataTableColumn<ProjectResponse>
 
 export function GroupDashboardScreen() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { identity, user } = useAuth();
 
-  const appliedQ = parseSearchQuery(searchParams.get("q"));
-  const appliedStatus = parseStatusFilter(searchParams.get("status"));
-  const query = useMemo(() => ({ q: appliedQ, status: appliedStatus }), [appliedQ, appliedStatus]);
+  const { values, setFilters, clearFilters, isFiltered } = useUrlFilters({
+    schema: dashboardFiltersSchema,
+    defaults: DASHBOARD_FILTER_DEFAULTS,
+    pathname: "/dashboard",
+  });
 
+  const [draftQ, setDraftQ] = useState(values.q);
+  const [urlQ, setUrlQ] = useState(values.q);
+  if (values.q !== urlQ) {
+    setUrlQ(values.q);
+    setDraftQ(values.q);
+  }
+
+  const debouncedQ = useDebouncedValue(draftQ, 300);
+
+  useEffect(() => {
+    const next = debouncedQ.trim();
+    if (next !== values.q) {
+      setFilters({ q: next });
+    }
+  }, [debouncedQ, setFilters, values.q]);
+
+  const query = useMemo(() => ({ q: values.q, status: values.status }), [values.q, values.status]);
   const { status, data, error, stale, reload } = useGroupDashboard(query);
-  const [draftQ, setDraftQ] = useState(appliedQ);
-  const [draftStatus, setDraftStatus] = useState<ProjectsStatusFilter>(appliedStatus);
 
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/dashboard", roles);
   const columns = useMemo(() => buildColumns(user), [user]);
 
-  const writeParams = (next: { q?: string; status?: ProjectsStatusFilter }) => {
-    const params = new URLSearchParams();
-    const q = next.q ?? appliedQ;
-    const statusFilter = next.status ?? appliedStatus;
-    if (q) params.set("q", q);
-    if (statusFilter !== ALL_STATUSES) params.set("status", statusFilter);
-    const qs = params.toString();
-    router.replace(qs ? `/dashboard?${qs}` : "/dashboard");
+  const chips = useMemo((): FilterChip[] => {
+    const next: FilterChip[] = [];
+    if (values.q) next.push({ id: "q", label: `Búsqueda: ${values.q}` });
+    if (values.status !== ALL_STATUSES) {
+      next.push({ id: "status", label: `Estado: ${statusChipLabel(values.status)}` });
+    }
+    return next;
+  }, [values.q, values.status]);
+
+  const handleRemoveChip = (id: string) => {
+    if (id === "q") {
+      setDraftQ("");
+      setFilters({ q: "" });
+      return;
+    }
+    if (id === "status") {
+      setFilters({ status: ALL_STATUSES });
+    }
+  };
+
+  const handleClear = () => {
+    setDraftQ("");
+    clearFilters();
   };
 
   if (!allowed) {
@@ -168,6 +201,25 @@ export function GroupDashboardScreen() {
   }
 
   const isBootLoading = status === "idle" || (status === "loading" && !data);
+  const noFilteredProjects = Boolean(data && isFiltered && data.projects.length === 0);
+  const tableEmpty = (
+    <EmptyState
+      kind={isFiltered ? "no-results" : "no-records"}
+      title={isFiltered ? "Sin resultados con estos filtros" : "Sin proyectos en esta vista"}
+      description={
+        isFiltered
+          ? "Prueba con otros filtros o limpia la búsqueda."
+          : "Ajusta los filtros o espera a que existan proyectos en el alcance."
+      }
+      action={
+        isFiltered ? (
+          <Button intent="secondary" type="button" onClick={handleClear}>
+            Limpiar filtros
+          </Button>
+        ) : undefined
+      }
+    />
+  );
 
   return (
     <S.Page>
@@ -188,31 +240,26 @@ export function GroupDashboardScreen() {
         </S.HeaderActions>
       </S.Header>
 
-      <S.FilterGrid>
-        <SearchField
-          label="Buscar proyecto"
-          value={draftQ}
-          onChange={setDraftQ}
-          placeholder="Buscar proyecto"
-        />
+      <FilterBar
+        searchLabel="Buscar proyecto"
+        searchValue={draftQ}
+        onSearchChange={setDraftQ}
+        chips={chips}
+        onRemoveChip={handleRemoveChip}
+        onClear={isFiltered ? handleClear : undefined}
+        resultCount={data?.totalProjects}
+        isLoading={status === "loading"}
+      >
         <Select
           label="Estado"
           options={PROJECT_STATUS_FILTER_OPTIONS}
-          value={draftStatus}
-          onValueChange={(value) => setDraftStatus(parseStatusFilter(value))}
+          value={values.status}
+          onValueChange={(value) => {
+            const option = PROJECT_STATUS_FILTER_OPTIONS.find((item) => item.value === value);
+            setFilters({ status: option ? (option.value as typeof values.status) : ALL_STATUSES });
+          }}
         />
-        <S.FilterActions>
-          <Button
-            intent="secondary"
-            type="button"
-            onClick={() => {
-              writeParams({ q: draftQ.trim(), status: draftStatus });
-            }}
-          >
-            Aplicar
-          </Button>
-        </S.FilterActions>
-      </S.FilterGrid>
+      </FilterBar>
 
       {stale ? (
         <S.StaleBanner role="status">
@@ -237,15 +284,19 @@ export function GroupDashboardScreen() {
           <S.Section aria-labelledby="dashboard-alerts">
             <S.SectionTitle id="dashboard-alerts">¿Qué necesita atención hoy?</S.SectionTitle>
             <AlertList
-              items={data.alerts}
-              emptyTitle="Todo al día"
-              emptyDescription="Sin alertas pendientes en el alcance actual."
+              items={noFilteredProjects ? [] : data.alerts}
+              emptyTitle={noFilteredProjects ? "Sin resultados con estos filtros" : "Todo al día"}
+              emptyDescription={
+                noFilteredProjects
+                  ? "Prueba con otros filtros o limpia la búsqueda."
+                  : "Sin alertas pendientes en el alcance actual."
+              }
             />
           </S.Section>
 
           <S.Section aria-labelledby="dashboard-comparison">
             <S.SectionTitle id="dashboard-comparison">Comparación con contexto</S.SectionTitle>
-            {data.comparison ? (
+            {data.comparison && !noFilteredProjects ? (
               <S.ComparisonCard>
                 <S.ComparisonTitle>
                   {data.comparison.projectTitle} · mismo periodo disponible
@@ -277,8 +328,9 @@ export function GroupDashboardScreen() {
             ) : (
               <S.ComparisonCard>
                 <S.Footnote>
-                  En producción, esta comparación solo aparece con medidas comparables y un contrato
-                  disponible. Nunca se sustituye un dato ausente por cero.
+                  {noFilteredProjects
+                    ? "Sin comparación disponible con los filtros actuales."
+                    : "En producción, esta comparación solo aparece con medidas comparables y un contrato disponible. Nunca se sustituye un dato ausente por cero."}
                 </S.Footnote>
               </S.ComparisonCard>
             )}
@@ -295,13 +347,7 @@ export function GroupDashboardScreen() {
               rows={data.projects}
               getRowId={(row) => row.id}
               isLoading={status === "loading"}
-              emptyState={
-                <EmptyState
-                  kind="no-records"
-                  title="Sin proyectos en esta vista"
-                  description="Ajusta los filtros o espera a que existan proyectos en el alcance."
-                />
-              }
+              emptyState={tableEmpty}
             />
           </S.Section>
         </>
