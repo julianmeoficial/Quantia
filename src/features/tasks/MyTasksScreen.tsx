@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/features/auth/AuthProvider";
 import { RegisterProgressPanel } from "@/features/progress";
 import { useRetrySync } from "@/features/sync";
+import { errorStatePropsFromApiError } from "@/lib/api";
 import { canAccess } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate, formatRelativeDue } from "@/lib/format";
@@ -359,28 +360,15 @@ function MyTasksBody() {
   }
 
   if (status === "error" && error) {
-    if (error.kind === "forbidden") {
-      return (
-        <ErrorState
-          variant="forbidden"
-          onRetry={() => router.replace("/")}
-          retryLabel="Volver al inicio"
-        />
-      );
-    }
-    if (error.kind === "not_found") {
-      return <ErrorState variant="not-found" onRetry={() => router.replace("/")} />;
-    }
-    if (error.kind === "rate_limited") {
-      return (
-        <ErrorState
-          variant="rate-limit"
-          retryAfterSeconds={error.retryAfterSeconds}
-          onRetry={reload}
-        />
-      );
-    }
-    return <ErrorState variant="server" onRetry={reload} />;
+    const ui = errorStatePropsFromApiError(error);
+    const goHome = ui.variant === "forbidden" || ui.variant === "not-found";
+    return (
+      <ErrorState
+        {...ui}
+        onRetry={goHome ? () => router.replace("/") : reload}
+        retryLabel={goHome ? "Volver al inicio" : undefined}
+      />
+    );
   }
 
   const allTasks = data?.tasks ?? [];

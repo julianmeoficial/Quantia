@@ -40,12 +40,14 @@ import {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
   deleteProjectDocument,
+  errorStatePropsFromApiError,
   getDocumentDownload,
   getProjectBudget,
   updateProjectTask,
   uploadProjectDocument,
 } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
+import { useRateLimitLock } from "@/lib/async/useRateLimitLock";
 import {
   canCreateProgress,
   canDeleteDocument,
@@ -355,18 +357,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   }
 
   if (boot.status === "error") {
-    if (boot.error.kind === "forbidden") {
-      return (
-        <S.Page>
-          <ErrorState
-            variant="forbidden"
-            onRetry={() => router.push(homeHref)}
-            retryLabel="Volver"
-          />
-        </S.Page>
-      );
-    }
-    if (boot.error.kind === "not_found") {
+    const ui = errorStatePropsFromApiError(boot.error);
+    if (ui.variant === "not-found") {
       return (
         <S.Page>
           <S.Centered>
@@ -381,20 +373,14 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         </S.Page>
       );
     }
-    if (boot.error.kind === "rate_limited") {
-      return (
-        <S.Page>
-          <ErrorState
-            variant="rate-limit"
-            retryAfterSeconds={boot.error.retryAfterSeconds}
-            onRetry={reloadProject}
-          />
-        </S.Page>
-      );
-    }
+    const goHome = ui.variant === "forbidden";
     return (
       <S.Page>
-        <ErrorState variant="server" onRetry={reloadProject} />
+        <ErrorState
+          {...ui}
+          onRetry={goHome ? () => router.push(homeHref) : reloadProject}
+          retryLabel={goHome ? "Volver" : undefined}
+        />
       </S.Page>
     );
   }
@@ -750,27 +736,15 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
       ) : null}
 
       {rateLimitError ? (
-        <S.Banner $tone="warning" role="status">
-          <S.BannerText>
-            Estamos procesando demasiadas solicitudes. Espera un momento antes de volver a
-            intentarlo
-            {rateLimitError.retryAfterSeconds !== undefined
-              ? ` (${rateLimitError.retryAfterSeconds} s).`
-              : "."}
-          </S.BannerText>
-          <Button
-            intent="secondary"
-            size="md"
-            type="button"
-            onClick={() => {
-              if (tab === "tareas") reloadTasks();
-              else if (tab === "bitacora") reloadProgress();
-              else reloadDocuments();
-            }}
-          >
-            Reintentar
-          </Button>
-        </S.Banner>
+        <WorkspaceRateLimitBanner
+          key={`${tab}:${rateLimitError.retryAfterSeconds ?? 0}:${rateLimitError.message}`}
+          retryAfterSeconds={rateLimitError.retryAfterSeconds ?? 5}
+          onRetry={() => {
+            if (tab === "tareas") reloadTasks();
+            else if (tab === "bitacora") reloadProgress();
+            else reloadDocuments();
+          }}
+        />
       ) : null}
 
       {projectDelayedAlert ? (
@@ -1078,5 +1052,27 @@ function DocumentsPanel({
         }
       />
     </S.Panel>
+  );
+}
+
+function WorkspaceRateLimitBanner({
+  retryAfterSeconds,
+  onRetry,
+}: {
+  retryAfterSeconds: number;
+  onRetry: () => void;
+}) {
+  const { locked, remaining } = useRateLimitLock(retryAfterSeconds);
+
+  return (
+    <S.Banner $tone="warning" role="status">
+      <S.BannerText>
+        Estamos procesando demasiadas solicitudes.
+        {locked ? ` Podrás reintentar en ${remaining} s.` : " Ya puedes volver a intentarlo."}
+      </S.BannerText>
+      <Button intent="secondary" size="md" type="button" disabled={locked} onClick={onRetry}>
+        Reintentar
+      </Button>
+    </S.Banner>
   );
 }

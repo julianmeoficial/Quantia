@@ -31,7 +31,7 @@ describe("ErrorState", () => {
         <ErrorState variant="forbidden" />
       </ThemeProvider>,
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("No tienes permiso");
+    expect(screen.getByRole("alert")).toHaveTextContent("No tienes acceso");
     expect(screen.queryByText(/[0-9a-f-]{36}/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/\/api\//i)).not.toBeInTheDocument();
   });

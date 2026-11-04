@@ -16,6 +16,7 @@ import {
   type ReportsFilters,
 } from "@/features/filters";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
+import { useRateLimitLock } from "@/lib/async/useRateLimitLock";
 import { canAccess, canGenerateReport } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate } from "@/lib/format";
@@ -61,8 +62,8 @@ function ReportsBody() {
   const [jobQuery, setJobQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [rateLimited, setRateLimited] = useState(false);
   const [toast, setToast] = useState<ReportToastState>(EMPTY_TOAST);
+  const rateLimit = useRateLimitLock();
 
   const { jobs, enqueue, retryFailed, download, isBusy } = useSessionReports(setToast);
 
@@ -120,8 +121,10 @@ function ReportsBody() {
       setFormError("Ya hay un reporte de este tipo en curso para el proyecto.");
       return;
     }
-    if (rateLimited) {
-      setFormError("Estamos procesando demasiadas solicitudes. Espera un momento.");
+    if (rateLimit.locked) {
+      setFormError(
+        `Estamos procesando demasiadas solicitudes. Vuelve a intentarlo en ${rateLimit.remaining} s.`,
+      );
       return;
     }
 
@@ -138,8 +141,7 @@ function ReportsBody() {
         setFormError("No tienes permiso para generar reportes en este proyecto.");
       } else if (result.error.kind === "rate_limited") {
         const waitSec = result.error.retryAfterSeconds ?? 5;
-        setRateLimited(true);
-        window.setTimeout(() => setRateLimited(false), waitSec * 1000);
+        rateLimit.start(waitSec);
         setFormError(
           `Estamos procesando demasiadas solicitudes. Vuelve a intentarlo en ${waitSec} s.`,
         );
@@ -194,7 +196,7 @@ function ReportsBody() {
             intent="primary"
             type="button"
             isLoading={isSubmitting}
-            disabled={!values.projectId || !values.kind || busy || rateLimited}
+            disabled={!values.projectId || !values.kind || busy || rateLimit.locked}
             onClick={() => {
               void handleGenerate();
             }}

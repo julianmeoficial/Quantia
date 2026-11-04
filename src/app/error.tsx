@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { StatusView } from "./_components/status-view";
+import { ErrorState } from "@/components/system";
 
 export default function Error({
   error,
@@ -16,14 +16,12 @@ export default function Error({
   }, [error]);
 
   return (
-    <StatusView
+    <ErrorState
+      variant="server"
       title="Algo salió mal"
       description="Ocurrió un error inesperado. Puedes intentarlo de nuevo."
-      action={
-        <button type="button" onClick={() => retry()}>
-          Reintentar
-        </button>
-      }
+      onRetry={() => retry()}
+      retryLabel="Reintentar"
     />
   );
 }

@@ -11,6 +11,8 @@ export {
 } from "./documents";
 export type { UploadDocumentOptions } from "./documents";
 export { ApiError, type ApiErrorKind } from "./errors";
+export { errorStatePropsFromApiError } from "./errorUi";
+export type { ErrorUiProps, ErrorUiVariant } from "./errorUi";
 export {
   createBudgetExecution,
   createProjectBudget,

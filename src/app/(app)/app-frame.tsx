@@ -6,7 +6,14 @@ import { useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/page/AppShell";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { NavBoot } from "@/features/auth/NavBoot";
+import { buildLoginHref } from "@/lib/auth";
 import { useSocketContext } from "@/lib/socket";
+
+function currentHref(pathname: string): string {
+  if (typeof window === "undefined") return pathname;
+  const search = window.location.search;
+  return search ? `${pathname}${search}` : pathname;
+}
 
 /** Product shell. Identity comes from GET /users/me. The JWT is never read. */
 export function AppFrame({ children }: { children: ReactNode }) {
@@ -17,8 +24,8 @@ export function AppFrame({ children }: { children: ReactNode }) {
     useSocketContext();
 
   useEffect(() => {
-    if (status === "anonymous") router.replace("/login");
-  }, [status, router]);
+    if (status === "anonymous") router.replace(buildLoginHref(currentHref(pathname)));
+  }, [status, router, pathname]);
 
   if (status === "booting" || status === "anonymous" || !identity) {
     return <NavBoot />;
@@ -48,7 +55,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
       }}
       sessionExpired={status === "sessionExpired"}
       onSessionAction={() => {
-        void endExpiredSession();
+        void endExpiredSession(currentHref(pathname));
       }}
     >
       {children}

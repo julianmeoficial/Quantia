@@ -10,8 +10,12 @@ import { LoginScreen } from "./LoginScreen";
 
 const login = vi.hoisted(() => vi.fn());
 
+const replace = vi.hoisted(() => vi.fn());
+const searchParams = vi.hoisted(() => new URLSearchParams());
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace }),
+  useSearchParams: () => searchParams,
 }));
 
 vi.mock("./AuthProvider", () => ({
@@ -29,6 +33,8 @@ function renderLogin(ui: ReactElement = <LoginScreen />) {
 describe("LoginScreen", () => {
   beforeEach(() => {
     login.mockReset();
+    replace.mockReset();
+    for (const key of [...searchParams.keys()]) searchParams.delete(key);
   });
 
   it("muestra etiquetas persistentes y no envía el formulario vacío", () => {
@@ -80,6 +86,25 @@ describe("LoginScreen", () => {
     expect(
       await screen.findByText("Algo salió mal. Vuelve a intentarlo en unos segundos."),
     ).toBeInTheDocument();
+  });
+
+  it("restaura la ruta from tras un login exitoso", async () => {
+    searchParams.set("from", "/mis-tareas");
+    login.mockResolvedValueOnce({
+      id: "11111111-1111-4111-8111-111111111111",
+      email: "ana@uni.edu.co",
+      fullName: "Ana Ruiz",
+      roles: ["INVESTIGADOR"],
+      isActive: true,
+      createdAt: "2026-11-04T12:00:00.000Z",
+      updatedAt: "2026-11-04T12:00:00.000Z",
+    });
+    renderLogin();
+    fillValid();
+    fireEvent.click(screen.getByRole("button", { name: "Inicia sesión de prueba" }));
+    await vi.waitFor(() => {
+      expect(replace).toHaveBeenCalledWith("/mis-tareas");
+    });
   });
 
   it("alterna la visibilidad de la contraseña", () => {

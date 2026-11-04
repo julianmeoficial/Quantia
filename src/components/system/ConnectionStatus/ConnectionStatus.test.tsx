@@ -22,7 +22,21 @@ describe("ConnectionStatus", () => {
         <ConnectionStatus state="disconnected" onReconnect={() => undefined} />
       </ThemeProvider>,
     );
-    expect(screen.getByText("Datos posiblemente desactualizados")).toBeInTheDocument();
+    const banner = screen.getByRole("status");
+    expect(banner).toHaveAttribute("aria-live", "polite");
+    expect(banner).toHaveTextContent("Datos posiblemente desactualizados");
     expect(screen.getByRole("button", { name: "Reconectar" })).toBeInTheDocument();
+  });
+
+  it("announces reconnecting politely without a reconnect button", () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <ConnectionStatus state="reconnecting" onReconnect={() => undefined} />
+      </ThemeProvider>,
+    );
+    const banner = screen.getByRole("status");
+    expect(banner).toHaveAttribute("aria-live", "polite");
+    expect(banner).toHaveTextContent("Reconectando…");
+    expect(screen.queryByRole("button", { name: "Reconectar" })).not.toBeInTheDocument();
   });
 });
