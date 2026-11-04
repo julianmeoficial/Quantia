@@ -45,14 +45,13 @@ import {
   landing,
 } from "@/lib/auth";
 import { formatDate, formatPercent } from "@/lib/format";
+import { useFrozenListOrder, useProjectSocket } from "@/lib/socket";
 
 import { EditTaskPanel } from "./EditTaskPanel";
 import * as S from "./ProjectWorkspaceScreen.styles";
 import { buildRiskComparison, pickPriorityTask, progressFromTasks } from "./projectRisk";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { WORKSPACE_TAB_LABEL, parseWorkspaceTab, type WorkspaceTab } from "./workspaceTab";
-
-const HIGHLIGHT_MS = 1500;
 
 function mapSync(status: "PENDING" | "SYNCED" | "FAILED"): SyncStatusValue {
   if (status === "PENDING") return "pending";
@@ -146,7 +145,6 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     setDocumentList,
   } = useProjectWorkspace(projectId, tab);
 
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     open: boolean;
     title: string;
@@ -168,6 +166,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const [budgetStatus, setBudgetStatus] = useState<"idle" | "loading" | "ready" | "missing">(
     "idle",
   );
+  const [localHighlightId, setLocalHighlightId] = useState<string | null>(null);
 
   const setTab = useCallback(
     (next: string) => {
@@ -183,14 +182,20 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     [projectId, router, searchParams],
   );
 
-  useEffect(() => {
-    if (!highlightedId) return;
-    const timer = window.setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
-    return () => window.clearTimeout(timer);
-  }, [highlightedId]);
-
   const homeHref = landing(user?.roles ?? []) ?? "/mis-tareas";
   const project = boot.status === "ready" ? boot.project : null;
+  const { highlightedTaskId, pendingProgressCount, clearPendingProgress, projectDelayedAlert } =
+    useProjectSocket(projectId, project);
+
+  const highlightedId = localHighlightId ?? highlightedTaskId;
+
+  useEffect(() => {
+    if (!localHighlightId) return;
+    const timer = window.setTimeout(() => setLocalHighlightId(null), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [localHighlightId]);
+
+  const frozenTasks = useFrozenListOrder(tasks.data);
   const allowProgress = user && project ? canCreateProgress(user, project) : false;
   const allowDeleteDoc = user && project ? canDeleteDocument(user, project) : false;
   const allowBudget = Boolean(user && canViewBudgetDetail(user));
@@ -224,8 +229,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   }, [allowBudget, project, projectId]);
 
   const priorityTask = useMemo(
-    () => (tasks.data ? pickPriorityTask(tasks.data) : null),
-    [tasks.data],
+    () => (frozenTasks.items.length ? pickPriorityTask(frozenTasks.items) : null),
+    [frozenTasks.items],
   );
   const progressPercent = useMemo(
     () => (tasks.data ? progressFromTasks(tasks.data) : null),
@@ -251,7 +256,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         syncStatus: "PENDING",
       };
       setTaskList((list) => list.map((item) => (item.id === task.id ? optimistic : item)));
-      setHighlightedId(task.id);
+      setLocalHighlightId(task.id);
       try {
         const saved = await updateProjectTask(projectId, task.id, { status: nextStatus });
         setTaskList((list) => list.map((item) => (item.id === task.id ? saved : item)));
@@ -472,10 +477,14 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
       content: (
         <TasksPanel
           panel={tasks}
+          tasks={frozenTasks.items}
           projectId={projectId}
           project={project}
           user={user}
           highlightedId={highlightedId}
+          pendingReorder={frozenTasks.hasPendingReorder}
+          pendingCount={frozenTasks.pendingCount}
+          onApplyOrder={frozenTasks.applyPendingOrder}
           onToggle={onToggleTask}
           onRetry={reloadTasks}
         />
@@ -488,6 +497,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         <BitacoraPanel
           panel={progress}
           items={timelineItems}
+          pendingNewCount={pendingProgressCount}
+          onApplyNew={clearPendingProgress}
           onRetry={reloadProgress}
           canCreate={allowProgress}
         />
@@ -744,6 +755,13 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         </S.Banner>
       ) : null}
 
+      {projectDelayedAlert ? (
+        <S.Banner $tone="danger" role="status">
+          <S.BannerText>
+            El proyecto «{projectDelayedAlert.title}» quedó marcado como retrasado.
+          </S.BannerText>
+        </S.Banner>
+      ) : null}
       {syncBanner && syncBanner.tone !== "success" ? (
         <S.Banner $tone={syncBanner.tone} role="status">
           <S.BannerText>{syncBanner.message}</S.BannerText>
@@ -785,7 +803,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         triggerRef={manageTaskTriggerRef}
         onSuccess={(updated) => {
           setTaskList((list) => list.map((item) => (item.id === updated.id ? updated : item)));
-          setHighlightedId(updated.id);
+          setLocalHighlightId(updated.id);
           setToast({
             open: true,
             title: "Tarea actualizada",
@@ -808,18 +826,26 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
 
 function TasksPanel({
   panel,
+  tasks,
   projectId,
   project,
   user,
   highlightedId,
+  pendingReorder,
+  pendingCount,
+  onApplyOrder,
   onToggle,
   onRetry,
 }: {
   panel: { status: string; data: TaskResponse[] | null; error: ApiError | null };
+  tasks: TaskResponse[];
   projectId: string;
   project: ProjectResponse;
   user: UserResponse;
   highlightedId: string | null;
+  pendingReorder: boolean;
+  pendingCount: number;
+  onApplyOrder: () => void;
   onToggle: (task: TaskResponse, checked: boolean) => void;
   onRetry: () => void;
 }) {
@@ -850,8 +876,20 @@ function TasksPanel({
 
   return (
     <S.Panel>
+      {pendingReorder ? (
+        <S.Banner $tone="info" role="status">
+          <S.BannerText>
+            {pendingCount > 1
+              ? `Lista actualizada · ${pendingCount} cambios nuevos`
+              : "Lista actualizada · Reordenar"}
+          </S.BannerText>
+          <Button type="button" intent="secondary" size="md" onClick={onApplyOrder}>
+            Aplicar orden
+          </Button>
+        </S.Banner>
+      ) : null}
       <S.TaskList>
-        {panel.data.map((task) => (
+        {tasks.map((task) => (
           <S.TaskListItem key={task.id}>
             <TaskRow
               title={task.title}
@@ -874,6 +912,8 @@ function TasksPanel({
 function BitacoraPanel({
   panel,
   items,
+  pendingNewCount,
+  onApplyNew,
   onRetry,
   canCreate,
 }: {
@@ -887,6 +927,8 @@ function BitacoraPanel({
     evidenceLabel?: string;
     syncStatus?: SyncStatusValue;
   }>;
+  pendingNewCount: number;
+  onApplyNew: () => void;
   onRetry: () => void;
   canCreate: boolean;
 }) {
@@ -921,6 +963,16 @@ function BitacoraPanel({
 
   return (
     <S.Panel>
+      {pendingNewCount > 0 ? (
+        <S.Banner $tone="info" role="status">
+          <S.BannerText>
+            {pendingNewCount === 1 ? "1 avance nuevo" : `${pendingNewCount} avances nuevos`}
+          </S.BannerText>
+          <Button type="button" intent="secondary" size="md" onClick={onApplyNew}>
+            Ver actualizaciones
+          </Button>
+        </S.Banner>
+      ) : null}
       <ActivityTimeline items={items} />
     </S.Panel>
   );
