@@ -361,6 +361,11 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     if (ui.variant === "not-found") {
       return (
         <S.Page>
+          <S.Header>
+            <S.HeaderText>
+              <S.Title>Proyecto</S.Title>
+            </S.HeaderText>
+          </S.Header>
           <S.Centered>
             <ErrorState
               variant="not-found"
@@ -376,6 +381,11 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     const goHome = ui.variant === "forbidden";
     return (
       <S.Page>
+        <S.Header>
+          <S.HeaderText>
+            <S.Title>Proyecto</S.Title>
+          </S.HeaderText>
+        </S.Header>
         <ErrorState
           {...ui}
           onRetry={goHome ? () => router.push(homeHref) : reloadProject}

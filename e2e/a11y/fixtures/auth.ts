@@ -18,8 +18,9 @@ function projectFixture(coordinatorId: string) {
     description: "Fixture e2e",
     objectives: null,
     status: "ACTIVE",
-    startDate: "2026-01-01",
-    endDate: "2026-12-31",
+    // Contract requires ISO date-time (not date-only).
+    startDate: "2026-01-01T05:00:00.000Z",
+    endDate: "2026-12-31T05:00:00.000Z",
     coordinatorId,
     createdById: coordinatorId,
     memberIds: [coordinatorId],
@@ -74,6 +75,10 @@ async function fulfillApi(route: Route, user: UserResponse) {
     return json(route, emptyPage());
   }
 
+  if (path.startsWith("/api/v1/projects/") && path.endsWith("/documents") && method === "GET") {
+    return json(route, emptyPage());
+  }
+
   if (path.startsWith("/api/v1/projects/") && path.endsWith("/budget") && method === "GET") {
     return json(
       route,
@@ -85,6 +90,15 @@ async function fulfillApi(route: Route, user: UserResponse) {
       },
       404,
     );
+  }
+
+  // GET /api/v1/projects/:id (detail — not a list)
+  if (/^\/api\/v1\/projects\/[^/]+$/.test(path) && method === "GET") {
+    return json(route, projectFixture(user.id));
+  }
+
+  if (path === "/api/v1/users" && method === "GET") {
+    return json(route, emptyPage([user]));
   }
 
   if (path === "/api/v1/chat/general/messages" && method === "GET") {
