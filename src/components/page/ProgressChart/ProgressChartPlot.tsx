@@ -3,7 +3,6 @@
 import {
   CartesianGrid,
   LabelList,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -17,6 +16,7 @@ import type { ProgressPoint, ProgressSeries } from "./types";
 
 const Plot = styled.div`
   width: 100%;
+  min-width: 0;
   height: calc(${({ theme }) => theme.space[64]} * 4);
 `;
 
@@ -36,15 +36,30 @@ export function ProgressChartPlot({ series, points }: ProgressChartPlotProps) {
     theme.colors.status.success.text,
   ];
   const data = points.map((point) => ({ label: point.label, ...point.values }));
+  // Text legend lives in ProgressChart (stroke style described in Spanish). Skip Recharts Legend
+  // so medium widths (768) stay readable without a duplicate key.
+  const tick = {
+    fill: theme.colors.text.secondary,
+    fontSize: theme.typography.caption.fontSize,
+  };
 
   return (
     <Plot>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={theme.colors.border.subtle} />
-          <XAxis dataKey="label" stroke={theme.colors.text.secondary} />
-          <YAxis stroke={theme.colors.text.secondary} />
-          <Legend />
+          <XAxis
+            dataKey="label"
+            stroke={theme.colors.text.secondary}
+            tick={tick}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            stroke={theme.colors.text.secondary}
+            tick={tick}
+            domain={[0, 100]}
+            tickFormatter={(value: number) => `${value}`}
+          />
           {series.map((item, index) => (
             <Line
               key={item.id}

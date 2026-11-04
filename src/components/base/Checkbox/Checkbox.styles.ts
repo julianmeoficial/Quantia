@@ -3,15 +3,23 @@ import styled from "styled-components";
 
 import { focusRing } from "@/components/base/shared/focus";
 
-export const Root = styled.label`
+export const Root = styled.label<{ $compact?: boolean }>`
   display: inline-flex;
   align-items: flex-start;
-  gap: ${({ theme }) => theme.space[8]};
+  gap: ${({ theme, $compact }) => ($compact ? 0 : theme.space[8])};
   min-height: ${({ theme }) => theme.sizes.control};
+  min-width: 0;
+  max-width: 100%;
   cursor: pointer;
   color: ${({ theme }) => theme.colors.text.primary};
   font-size: ${({ theme }) => theme.typography.bodyMedium.fontSize};
   line-height: ${({ theme }) => theme.typography.bodyMedium.lineHeight};
+
+  ${({ $compact }) =>
+    $compact &&
+    `
+    position: relative;
+  `}
 
   &[data-disabled="true"] {
     color: ${({ theme }) => theme.colors.text.secondary};
@@ -55,8 +63,23 @@ export const Indicator = styled(CheckboxPrimitive.Indicator)`
   font-size: ${({ theme }) => theme.typography.caption.fontSize};
 `;
 
-export const Text = styled.span`
+export const Text = styled.span<{ $visuallyHidden?: boolean }>`
   padding-block: ${({ theme }) => theme.space[8]};
+  min-width: 0;
+
+  ${({ $visuallyHidden }) =>
+    $visuallyHidden &&
+    `
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  `}
 `;
 
 export const Help = styled.span`

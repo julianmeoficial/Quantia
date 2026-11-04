@@ -39,6 +39,8 @@ const Frame = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
+  max-width: 100%;
   background: ${({ theme }) => theme.colors.bg.canvas};
 `;
 
@@ -71,6 +73,8 @@ const Body = styled.div`
   flex: 1;
   align-items: stretch;
   gap: ${({ theme }) => theme.space[24]};
+  min-width: 0;
+  max-width: 100%;
   padding: ${({ theme }) => theme.space[16]};
 `;
 

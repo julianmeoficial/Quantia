@@ -30,6 +30,34 @@ function projectFixture(coordinatorId: string) {
   };
 }
 
+function taskFixtures(user: UserResponse) {
+  const base = {
+    projectId: PROJECT_ID,
+    description: null,
+    assigneeId: user.id,
+    priority: "HIGH" as const,
+    syncStatus: "SYNCED" as const,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-11-04T17:00:00.000Z",
+  };
+  return [
+    {
+      ...base,
+      id: "66666666-6666-4666-8666-666666666601",
+      title: "Encuesta piloto",
+      status: "DONE" as const,
+      dueDate: "2026-10-20T05:00:00.000Z",
+    },
+    {
+      ...base,
+      id: "66666666-6666-4666-8666-666666666602",
+      title: "Informe parcial",
+      status: "IN_PROGRESS" as const,
+      dueDate: "2026-11-20T05:00:00.000Z",
+    },
+  ];
+}
+
 function apiPath(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -68,7 +96,11 @@ async function fulfillApi(route: Route, user: UserResponse) {
   }
 
   if (path.startsWith("/api/v1/projects/") && path.endsWith("/tasks") && method === "GET") {
-    return json(route, emptyPage());
+    const url = new URL(requestUrl);
+    const assigneeId = url.searchParams.get("assigneeId");
+    const tasks = taskFixtures(user);
+    const filtered = assigneeId ? tasks.filter((task) => task.assigneeId === assigneeId) : tasks;
+    return json(route, emptyPage(filtered));
   }
 
   if (path.startsWith("/api/v1/projects/") && path.endsWith("/progress") && method === "GET") {

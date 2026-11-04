@@ -16,6 +16,8 @@ export interface CheckboxProps {
   name?: string;
   id?: string;
   description?: string;
+  /** Keep accessible name but hide the visible label (e.g. TaskRow control). */
+  labelVisuallyHidden?: boolean;
 }
 
 export function Checkbox({
@@ -28,9 +30,10 @@ export function Checkbox({
   name,
   id,
   description,
+  labelVisuallyHidden = false,
 }: CheckboxProps) {
   return (
-    <S.Root data-disabled={disabled ? "true" : undefined}>
+    <S.Root data-disabled={disabled ? "true" : undefined} $compact={labelVisuallyHidden}>
       <S.Control
         id={id}
         checked={checked}
@@ -48,7 +51,7 @@ export function Checkbox({
       >
         <S.Indicator>{checked === "indeterminate" ? <MinusIcon /> : <CheckIcon />}</S.Indicator>
       </S.Control>
-      <S.Text>
+      <S.Text $visuallyHidden={labelVisuallyHidden}>
         {label}
         {required ? " (obligatorio)" : null}
         {description ? <S.Help>{description}</S.Help> : null}

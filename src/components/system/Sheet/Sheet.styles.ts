@@ -92,14 +92,25 @@ export const Footer = styled.div`
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: ${({ theme }) => theme.space[24]};
+  gap: ${({ theme }) => theme.space[12]};
   flex-shrink: 0;
   padding: ${({ theme }) => `${theme.space[12]} ${theme.space[16]} ${theme.space[16]}`};
   border-top: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
   background: ${({ theme }) => theme.colors.bg.surface};
 
+  /* Compact (390): full-width stacked actions for ≥44 px touch targets without page overflow. */
   & > * {
-    min-width: 10rem;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  ${({ theme }) => theme.media.up("md")} {
+    gap: ${({ theme }) => theme.space[24]};
+
+    & > * {
+      flex: 1 1 auto;
+      min-width: ${({ theme }) => `calc(${theme.space[64]} + ${theme.space[48]})`};
+    }
   }
 `;
