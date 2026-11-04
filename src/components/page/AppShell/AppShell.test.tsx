@@ -105,6 +105,19 @@ describe("AppShell", () => {
     expect(screen.queryByRole("heading", { name: "Convocatoria" })).not.toBeInTheDocument();
   });
 
+  it("blocks auditoría deep links for non-administrators", () => {
+    renderWithTheme(
+      <AppShell
+        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"] }}
+        pathname="/auditoria"
+      >
+        <h1>Auditoría</h1>
+      </AppShell>,
+    );
+    expect(screen.getByText("No tienes permiso para ver esta sección")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Auditoría" })).not.toBeInTheDocument();
+  });
+
   it("keeps the screen mounted when the session expires", () => {
     renderWithTheme(
       <AppShell

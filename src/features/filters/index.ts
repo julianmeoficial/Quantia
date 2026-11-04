@@ -13,6 +13,7 @@ export {
   TASK_PRIORITY_FILTER_OPTIONS,
   TASK_SORT_OPTIONS,
   TASK_STATUS_FILTER_OPTIONS,
+  USERS_LIST_FILTER_DEFAULTS,
   budgetFiltersSchema,
   dashboardFiltersSchema,
   progressListFiltersSchema,
@@ -24,6 +25,7 @@ export {
   taskPriorityChipLabel,
   taskStatusChipLabel,
   tasksListFiltersSchema,
+  usersListFiltersSchema,
 } from "./filterSchemas";
 export type {
   BudgetFilters,
@@ -32,4 +34,5 @@ export type {
   ProjectListFilters,
   ReportsFilters,
   TasksListFilters,
+  UsersListFilters,
 } from "./filterSchemas";

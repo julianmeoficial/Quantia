@@ -78,6 +78,12 @@ export function isConvocatoriasPath(pathname: string): boolean {
   return path === "/convocatorias" || path.startsWith("/convocatorias/");
 }
 
+/** Deep-link route for ADM-03; hidden from nav until the audit contract exists. */
+export function isAuditoriaPath(pathname: string): boolean {
+  const path = normalizePath(pathname);
+  return path === "/auditoria" || path.startsWith("/auditoria/");
+}
+
 /** Segment after `/convocatorias/`, or null when the path is not a call detail URL. */
 export function callRouteId(pathname: string): string | null {
   const path = normalizePath(pathname);
@@ -91,7 +97,7 @@ export function accessFor(pathname: string, roles: readonly AppRole[]): RouteAcc
   if (entry) {
     return entry.roles.some((role) => roles.includes(role)) ? "allowed" : "denied";
   }
-  if (isConvocatoriasPath(path)) {
+  if (isConvocatoriasPath(path) || isAuditoriaPath(path)) {
     return roles.includes("ADMINISTRADOR") ? "allowed" : "denied";
   }
   return "unknown";
