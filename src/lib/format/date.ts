@@ -38,6 +38,18 @@ export function formatDate(
   return `${dateText} ${hour}:${minute}`;
 }
 
+/** Clock time only (`HH:mm`) in America/Bogota — used by ChatMessage. */
+export function formatTime(value: string | Date | null | undefined): string {
+  if (value === null || value === undefined || value === "") return EMPTY;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return EMPTY;
+  const parts = partsInBogota(date);
+  const hour = parts.get("hour");
+  const minute = parts.get("minute");
+  if (!hour || !minute) return EMPTY;
+  return `${hour}:${minute}`;
+}
+
 function parseDisplayDate(value: string): { year: number; month: number; day: number } | null {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
   if (!match) return null;

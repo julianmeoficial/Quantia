@@ -2,6 +2,7 @@ export {
   accessFor,
   callRouteId,
   isAuditoriaPath,
+  isChatPath,
   isConvocatoriasPath,
   landing,
   navigationFor,

@@ -1,4 +1,4 @@
-export { formatDate, formatRange, toApiDate } from "./date";
+export { formatDate, formatRange, formatTime, toApiDate } from "./date";
 export { formatCOP } from "./currency";
 export { compareMoney, rubricExecutionStatus, sumMoney } from "./money";
 export type { RubricExecutionStatus } from "./money";
