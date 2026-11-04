@@ -14,7 +14,8 @@ export interface AvatarProps {
   announceName?: boolean;
 }
 
-function initialsFromName(name: string): string {
+/** Shared with account triggers so the aria-label includes visible initials (WCAG 2.5.3). */
+export function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) {

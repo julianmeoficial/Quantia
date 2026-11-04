@@ -4,6 +4,7 @@ import { ThemeProvider } from "styled-components";
 import { describe, expect, it } from "vitest";
 
 import { theme } from "@/theme";
+import { expectNoSeriousAxeViolations } from "../../../../tests/axe";
 
 import { Button } from "./Button";
 
@@ -22,5 +23,10 @@ describe("Button", () => {
     const button = screen.getByRole("button", { name: "Guardando" });
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).not.toBeDisabled();
+  });
+
+  it("has no serious or critical axe violations", async () => {
+    const { container } = renderButton(<Button intent="primary">Guardar avance</Button>);
+    await expectNoSeriousAxeViolations(container);
   });
 });

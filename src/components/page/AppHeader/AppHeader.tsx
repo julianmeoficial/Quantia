@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { DropdownMenu as DropdownMenuPrimitive, Popover as PopoverPrimitive } from "radix-ui";
 import styled from "styled-components";
 
-import { Avatar, Link } from "@/components/base";
+import { Avatar, initialsFromName, Link } from "@/components/base";
 import { focusRing } from "@/components/base/shared/focus";
 import { ConnectionStatus } from "@/components/system";
 import type { ConnectionState } from "@/components/system";
@@ -323,7 +323,10 @@ export function AppHeader({
         {roleLabel ? <Role>{roleLabel}</Role> : null}
         <DropdownMenuPrimitive.Root>
           <DropdownMenuPrimitive.Trigger asChild>
-            <AccountButton type="button" aria-label={`Cuenta de ${userName}`}>
+            <AccountButton
+              type="button"
+              aria-label={`${initialsFromName(userName)}, cuenta de ${userName}`}
+            >
               <Avatar name={userName} announceName={false} />
             </AccountButton>
           </DropdownMenuPrimitive.Trigger>
