@@ -277,15 +277,13 @@ function AuditBody() {
         </>
       )}
 
-      {exportKind ? (
-        <ExportReportPanel
-          open
-          kind={exportKind}
-          onOpenChange={(open) => {
-            if (!open) setExportKind(null);
-          }}
-        />
-      ) : null}
+      <ExportReportPanel
+        open={exportKind !== null}
+        kind={exportKind ?? ReportKind.BUDGET_PDF}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setExportKind(null);
+        }}
+      />
     </S.Page>
   );
 }

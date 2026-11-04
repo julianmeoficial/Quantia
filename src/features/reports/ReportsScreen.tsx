@@ -1,8 +1,8 @@
 "use client";
 
 import { ReportKind, type ReportKind as ReportKindType } from "@quantia/contracts";
-import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import { Button, Select } from "@/components/base";
 import { FilterBar, type FilterChip } from "@/components/composite";
@@ -16,21 +16,14 @@ import {
   type ReportsFilters,
 } from "@/features/filters";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
-import { createProjectReport, getProjectReport } from "@/lib/api";
-import { ApiError } from "@/lib/api/errors";
-import { pollWithBackoff } from "@/lib/async/pollWithBackoff";
 import { canAccess, canGenerateReport } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate } from "@/lib/format";
 import { useUrlFilters } from "@/lib/url";
 
 import * as S from "../tasks/sectionPage.styles";
-import {
-  fromReportResponse,
-  readSessionReports,
-  upsertSessionReport,
-  type SessionReportJob,
-} from "./sessionReportsStore";
+import type { SessionReportJob } from "./sessionReportsStore";
+import { useSessionReports, type ReportToastState } from "./useSessionReports";
 
 const STATUS_LABEL: Record<SessionReportJob["status"], string> = {
   QUEUED: "En cola",
@@ -38,6 +31,8 @@ const STATUS_LABEL: Record<SessionReportJob["status"], string> = {
   READY: "Listo",
   FAILED: "Fallido",
 };
+
+const EMPTY_TOAST: ReportToastState = { open: false, title: "" };
 
 export function ReportsScreen() {
   return (
@@ -63,14 +58,13 @@ function ReportsBody() {
     [projectsState.projects, values.projectId],
   );
 
-  const [jobs, setJobs] = useState<SessionReportJob[]>(() => readSessionReports());
   const [jobQuery, setJobQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
-    open: false,
-    title: "",
-  });
+  const [rateLimited, setRateLimited] = useState(false);
+  const [toast, setToast] = useState<ReportToastState>(EMPTY_TOAST);
+
+  const { jobs, enqueue, retryFailed, download, isBusy } = useSessionReports(setToast);
 
   const visibleJobs = useMemo(() => {
     const needle = jobQuery.trim().toLowerCase();
@@ -103,18 +97,10 @@ function ReportsBody() {
     return next;
   }, [selectedProject, values.kind]);
 
-  const pollJob = useCallback(async (projectId: string, reportId: string, projectTitle: string) => {
-    const result = await pollWithBackoff({
-      fetch: () => getProjectReport(projectId, reportId),
-      isDone: (report) => report.status === "READY" || report.status === "FAILED",
-      onUpdate: (report) => {
-        setJobs(upsertSessionReport(fromReportResponse(report, projectTitle)));
-      },
-    });
-    if (result) {
-      setJobs(upsertSessionReport(fromReportResponse(result, projectTitle)));
-    }
-  }, []);
+  const selectedKind = (values.kind || kindOptions[0]?.value || "") as ReportKindType | "";
+  const busy =
+    Boolean(values.projectId && selectedKind) &&
+    isBusy(values.projectId, selectedKind as ReportKindType);
 
   const handleGenerate = async () => {
     setFormError(null);
@@ -130,70 +116,54 @@ function ReportsBody() {
       setFormError("No tienes permiso para generar este tipo de reporte.");
       return;
     }
+    if (busy) {
+      setFormError("Ya hay un reporte de este tipo en curso para el proyecto.");
+      return;
+    }
+    if (rateLimited) {
+      setFormError("Estamos procesando demasiadas solicitudes. Espera un momento.");
+      return;
+    }
 
     setIsSubmitting(true);
-    try {
-      const accepted = await createProjectReport(selectedProject.id, {
-        kind: values.kind as ReportKindType,
-      });
-      const placeholder: SessionReportJob = {
-        reportId: accepted.reportId,
-        projectId: selectedProject.id,
-        projectTitle: selectedProject.title,
-        kind: values.kind as ReportKindType,
-        status: accepted.status,
-        errorMessage: null,
-        downloadUrl: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setJobs(upsertSessionReport(placeholder));
-      setToast({
-        open: true,
-        title: "Generando reporte",
-        description: reportKindChipLabel(values.kind),
-      });
-      void pollJob(selectedProject.id, accepted.reportId, selectedProject.title);
-    } catch (cause: unknown) {
-      const apiError = cause instanceof ApiError ? cause : new ApiError("unknown", null);
-      if (apiError.kind === "forbidden") {
+    const result = await enqueue({
+      projectId: selectedProject.id,
+      projectTitle: selectedProject.title,
+      kind: values.kind as ReportKindType,
+    });
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      if (result.error.kind === "forbidden") {
         setFormError("No tienes permiso para generar reportes en este proyecto.");
-      } else if (apiError.kind === "rate_limited") {
+      } else if (result.error.kind === "rate_limited") {
+        const waitSec = result.error.retryAfterSeconds ?? 5;
+        setRateLimited(true);
+        window.setTimeout(() => setRateLimited(false), waitSec * 1000);
         setFormError(
-          "Estamos procesando demasiadas solicitudes. Inténtalo de nuevo en unos segundos.",
+          `Estamos procesando demasiadas solicitudes. Vuelve a intentarlo en ${waitSec} s.`,
         );
+      } else if (result.error.kind === "conflict") {
+        setFormError("Ya hay un reporte de este tipo en curso para el proyecto.");
       } else {
         setFormError("No pudimos iniciar el reporte. Inténtalo de nuevo.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   const handleRetry = async (job: SessionReportJob) => {
     setFormError(null);
     setIsSubmitting(true);
-    try {
-      const accepted = await createProjectReport(job.projectId, { kind: job.kind });
-      const placeholder: SessionReportJob = {
-        ...job,
-        reportId: accepted.reportId,
-        status: accepted.status,
-        errorMessage: null,
-        downloadUrl: null,
-        updatedAt: new Date().toISOString(),
-      };
-      setJobs(upsertSessionReport(placeholder));
-      void pollJob(job.projectId, accepted.reportId, job.projectTitle);
-    } catch (cause: unknown) {
-      const apiError = cause instanceof ApiError ? cause : new ApiError("unknown", null);
+    const result = await retryFailed(job);
+    setIsSubmitting(false);
+    if (!result.ok) {
       setFormError(
-        apiError.kind === "forbidden"
+        result.error.kind === "forbidden"
           ? "No tienes permiso para reintentar este reporte."
-          : "No pudimos reintentar el reporte.",
+          : result.error.kind === "rate_limited"
+            ? "Estamos procesando demasiadas solicitudes. Inténtalo de nuevo en unos segundos."
+            : "No pudimos reintentar el reporte.",
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -224,7 +194,7 @@ function ReportsBody() {
             intent="primary"
             type="button"
             isLoading={isSubmitting}
-            disabled={!values.projectId || !values.kind}
+            disabled={!values.projectId || !values.kind || busy || rateLimited}
             onClick={() => {
               void handleGenerate();
             }}
@@ -313,15 +283,14 @@ function ReportsBody() {
               </S.JobTitle>
               <S.JobMeta>
                 {STATUS_LABEL[job.status]} · {formatDate(job.createdAt)}
-                {job.errorMessage ? ` · ${job.errorMessage}` : ""}
               </S.JobMeta>
               <S.JobActions>
-                {job.status === "READY" && job.downloadUrl ? (
+                {job.status === "READY" ? (
                   <Button
                     intent="primary"
                     type="button"
                     onClick={() => {
-                      window.open(job.downloadUrl ?? undefined, "_blank", "noopener,noreferrer");
+                      void download(job);
                     }}
                   >
                     Descargar
@@ -353,7 +322,8 @@ function ReportsBody() {
         onOpenChange={(open) => setToast((prev) => ({ ...prev, open }))}
         title={toast.title}
         description={toast.description}
-        tone="success"
+        tone={toast.tone ?? "neutral"}
+        action={toast.action}
       />
     </S.Page>
   );
