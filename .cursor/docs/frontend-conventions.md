@@ -3,8 +3,9 @@
 Canonical path: `.cursor/docs/frontend-conventions.md` (not `docs/frontend-conventions.md`).
 Operational detail behind `.cursorrules` and `AGENTS.md`. Mónica uses this file as the PR review checklist.
 
-Related: `DESIGN.md` · `.cursor/docs/SCREENS.md` · `.cursor/rules/ui-design-system.mdc` ·
-`.cursor/rules/accessibility-ux.mdc` · `.cursor/rules/api-integration.mdc`
+Related: `DESIGN.md` · `.cursor/docs/SCREENS.md` · `.cursor/docs/api-connection.md` ·
+`.cursor/rules/ui-design-system.mdc` · `.cursor/rules/accessibility-ux.mdc` ·
+`.cursor/rules/api-integration.mdc`
 
 ## 1. Folder structure
 
@@ -41,11 +42,13 @@ src/
 │  ├─ tokens.ts · light.ts · dark.ts · mixins.ts
 │  ├─ registry.tsx               # styled-components SSR registry
 │  └─ styled.d.ts                # DefaultTheme typing
+├─ config/
+│  └─ env.ts                     # the only reader of process.env (Zod)
 └─ lib/
-   ├─ config.ts                  # the only reader of process.env
-   ├─ api/                       # client.ts, errors.ts, query-keys.ts, one file per domain
-   ├─ auth/                      # permissions.ts
-   ├─ socket/                    # client.ts, events.ts, provider.tsx (typed from contracts)
+   ├─ api/                       # client.ts, errors.ts, errorUi.ts, query-keys.ts, sync.ts, one file per domain
+   ├─ auth/                      # permissions.ts, returnPath.ts
+   ├─ socket/                    # connection.ts, events.ts, SocketProvider, useProjectSocket, useGeneralSocket
+   ├─ query/                     # QueryProvider + shared QueryClient
    └─ format/                    # currency.ts (COP), date.ts (DD/MM/AAAA, toApiDate), percent.ts
 ```
 

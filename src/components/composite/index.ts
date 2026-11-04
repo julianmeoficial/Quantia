@@ -8,6 +8,8 @@ export { FilterBar } from "./FilterBar";
 export type { FilterBarProps, FilterChip } from "./FilterBar";
 export { MessageComposer } from "./MessageComposer";
 export type { MessageComposerProps } from "./MessageComposer";
+export { PresenceList } from "./PresenceList";
+export type { PresenceListProps } from "./PresenceList";
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
 export { ProgressBar } from "./ProgressBar";

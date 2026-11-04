@@ -5,7 +5,8 @@ Status: implementation-ready visual brief. The agent is authorized to design and
 Language: English documentation, Spanish user-facing copy. Visual foundation: `DESIGN.md`. Do not fork its tokens or create screen-specific component families.
 
 Related: `.cursorrules` · `AGENTS.md` · `DESIGN.md` · `.cursor/docs/frontend-conventions.md` ·
-`.cursor/rules/ui-design-system.mdc` · `.cursor/rules/accessibility-ux.mdc` · `.cursor/rules/api-integration.mdc`
+`.cursor/docs/api-connection.md` · `.cursor/rules/ui-design-system.mdc` ·
+`.cursor/rules/accessibility-ux.mdc` · `.cursor/rules/api-integration.mdc`
 
 ## 1. Product Experience and Source Authority
 
@@ -109,6 +110,8 @@ Socket profiles used by the screen registry:
 - None: no screen-specific socket; authenticated global shell may still own N.
   One provider owns all sockets. Respect the documented total five-connections-per-user limit across tabs/namespaces; do not create one socket per component/project row. No leave event is documented; unmount/disconnect owned project scope and ignore irrelevant payloads. Do not invent overview/global project subscriptions.
   Missing contract events: reporte.completado and sync.failed. Reports use polling; sync state is read from REST. No screen may subscribe to these proposed names until contracts support them.
+
+F3 (DS-117) closes realtime UX via DS-119 (Socket.io + React Query), DS-120 (SyncStatus + provisional admin retry), DS-121 (async report poll/toast), and DS-122 (401/403/429 + ConnectionStatus). Chat General live namespace is DS-124. Operational connection guide: `.cursor/docs/api-connection.md`.
 
 ## 5. Canonical Screen Registry
 

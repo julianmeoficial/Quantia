@@ -5,8 +5,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/AuthProvider";
 import { createGeneralChatMessage } from "@/lib/api/chat";
+import { insertChatMessageInCache } from "@/lib/api/chatCache";
 import { ApiError } from "@/lib/api/errors";
-import { queryKeys } from "@/lib/api/query-keys";
 import type { GeneralChatMessageDto } from "@quantia/contracts";
 
 import type { OptimisticChatMessage } from "./mergeChatMessages";
@@ -121,33 +121,7 @@ export function useSendGeneralChatMessage(): UseSendGeneralChatMessageState {
       try {
         const confirmed = await mutation.mutateAsync({ content, clientMessageId });
         dropOptimistic(clientMessageId);
-        queryClient.setQueryData(queryKeys.chatGeneralHistory, (current: unknown) => {
-          if (!current || typeof current !== "object" || !("pages" in current)) {
-            return {
-              pages: [{ items: [confirmed], nextCursor: null, hasMore: false }],
-              pageParams: [undefined],
-            };
-          }
-          const data = current as {
-            pages: {
-              items: GeneralChatMessageDto[];
-              nextCursor: string | null;
-              hasMore: boolean;
-            }[];
-            pageParams: unknown[];
-          };
-          const pages = data.pages.map((page, index) => {
-            if (index !== 0) return page;
-            const already = page.items.some(
-              (item) =>
-                item.id === confirmed.id ||
-                (confirmed.clientMessageId && item.clientMessageId === confirmed.clientMessageId),
-            );
-            if (already) return page;
-            return { ...page, items: [confirmed, ...page.items] };
-          });
-          return { ...data, pages };
-        });
+        insertChatMessageInCache(queryClient, confirmed);
       } catch (cause) {
         const error = cause instanceof ApiError ? cause : new ApiError("unknown", null);
         if (error.kind === "rate_limited") {
