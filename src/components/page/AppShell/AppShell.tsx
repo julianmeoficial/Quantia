@@ -4,12 +4,13 @@ import { useState, type ReactNode } from "react";
 import styled from "styled-components";
 
 import { IconButton } from "@/components/base";
-import { AppHeader } from "@/components/page/AppHeader";
+import { AppHeader, type AppHeaderCrumb } from "@/components/page/AppHeader";
 import { RoleSidebar } from "@/components/page/RoleSidebar";
 import { ErrorState } from "@/components/system";
 import type { ConnectionState } from "@/components/system";
 import {
   accessFor,
+  callRouteId,
   landing,
   navigationFor,
   primaryRole,
@@ -19,6 +20,19 @@ import {
 import type { SessionIdentity } from "@/lib/auth";
 
 import { MenuIcon, iconForHref } from "./nav-icons";
+
+function crumbsFor(pathname: string, home: string | null, denied: boolean): AppHeaderCrumb[] {
+  const callId = callRouteId(pathname);
+  if (callId && !denied) {
+    return [{ label: "quantia.udc", href: "/institucional" }, { label: `convocatorias/${callId}` }];
+  }
+
+  const section = sectionLabel(pathname);
+  return [
+    { label: "Quantia", href: home ?? undefined },
+    ...(section && !denied ? [{ label: section }] : []),
+  ];
+}
 
 const Frame = styled.div`
   display: flex;
@@ -147,13 +161,9 @@ export function AppShell({
     icon: iconForHref(entry.href),
   }));
   const home = landing(identity.roles);
-  const section = sectionLabel(pathname);
   const role = primaryRole(identity.roles);
   const denied = accessFor(pathname, identity.roles) === "denied";
-  const crumbs = [
-    { label: "Quantia", href: home ?? undefined },
-    ...(section && !denied ? [{ label: section }] : []),
-  ];
+  const crumbs = crumbsFor(pathname, home, denied);
 
   return (
     <Frame>
