@@ -1,6 +1,7 @@
 export {
   accessFor,
   callRouteId,
+  isAuditoriaPath,
   isConvocatoriasPath,
   landing,
   navigationFor,

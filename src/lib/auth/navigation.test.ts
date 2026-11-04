@@ -34,4 +34,12 @@ describe("navigation matrix", () => {
     expect(accessFor("/convocatorias/2026-01", ["INVESTIGADOR"])).toBe("denied");
     expect(canAccess("/convocatorias/2026-01", ["INVESTIGADOR"])).toBe(false);
   });
+
+  it("allows auditoría deep links only for administrators", () => {
+    expect(accessFor("/auditoria", ["ADMINISTRADOR"])).toBe("allowed");
+    expect(canAccess("/auditoria", ["ADMINISTRADOR"])).toBe(true);
+    expect(accessFor("/auditoria", ["COORDINADOR"])).toBe("denied");
+    expect(accessFor("/auditoria", ["INVESTIGADOR"])).toBe("denied");
+    expect(canAccess("/auditoria", ["COORDINADOR"])).toBe(false);
+  });
 });

@@ -116,6 +116,21 @@ export const BUDGET_FILTER_DEFAULTS: BudgetFilters = {
   projectId: "",
 };
 
+/** ADM-04 — GET /users supports page/pageSize/sortOrder only. */
+export const usersListFiltersSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export type UsersListFilters = z.infer<typeof usersListFiltersSchema>;
+
+export const USERS_LIST_FILTER_DEFAULTS: UsersListFilters = {
+  page: 1,
+  pageSize: 20,
+  sortOrder: "desc",
+};
+
 /** REP-01 shareable project + UI kind (POST body still only `{ kind }`). */
 export const reportsFiltersSchema = z.object({
   projectId: projectIdSchema,

@@ -30,4 +30,12 @@ export {
   setAccessToken,
 } from "./session";
 export { createProjectTask, getProjectTask, listProjectTasks, updateProjectTask } from "./tasks";
-export { getMe, searchUserDirectory } from "./users";
+export {
+  createUser,
+  deleteUser,
+  getMe,
+  getUser,
+  listUsers,
+  searchUserDirectory,
+  updateUser,
+} from "./users";
