@@ -1,63 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import styled from "styled-components";
-
-import { Button, Link } from "@/components/base";
+import { Badge, Button, STATUS_BADGE } from "@/components/base";
 import { DataTable } from "@/components/page/DataTable";
-import { ConfirmDialog } from "@/components/system";
 import { formatCOP, formatPercent } from "@/lib/format";
+import type { RubricExecutionStatus } from "@/lib/format";
 
-const Panel = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space[24]};
-  padding: ${({ theme }) => theme.space[24]};
-  background: ${({ theme }) => theme.colors.bg.surface};
-  border: ${({ theme }) => theme.borderWidths.thin} solid
-    ${({ theme }) => theme.colors.border.subtle};
-  border-radius: ${({ theme }) => theme.radii.card};
-`;
-
-const Summary = styled.dl`
-  display: grid;
-  gap: ${({ theme }) => theme.space[12]};
-  margin: 0;
-
-  ${({ theme }) => theme.media.up("md")} {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-`;
-
-const Term = styled.dt`
-  margin: 0;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  font-size: ${({ theme }) => theme.typography.label.fontSize};
-`;
-
-const Detail = styled.dd`
-  margin: 0;
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: ${({ theme }) => theme.typography.headingSmall.fontSize};
-  font-weight: ${({ theme }) => theme.typography.headingSmall.fontWeight};
-`;
+import * as S from "./BudgetPanel.styles";
 
 export interface BudgetLine {
   id: string;
   rubric: string;
   planned: string;
   spent: string;
-  evidenceHref?: string;
-  evidenceLabel?: string;
+  status: RubricExecutionStatus;
 }
+
+export type BudgetPanelMode = "detail" | "summary";
 
 export interface BudgetPanelProps {
   assigned: string;
   executed: string;
   executedPercent: number;
   lines: BudgetLine[];
+  mode?: BudgetPanelMode;
   canEdit?: boolean;
-  onRemoveLine?: (id: string) => void;
+  onEdit?: () => void;
+  onOpenEvidence?: (lineId: string) => void;
+}
+
+function StatusCell({ status }: { status: RubricExecutionStatus }) {
+  const presentation = STATUS_BADGE[status];
+  const Icon = presentation.icon;
+  return <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />;
 }
 
 export function BudgetPanel({
@@ -65,83 +39,84 @@ export function BudgetPanel({
   executed,
   executedPercent,
   lines,
+  mode = "detail",
   canEdit = false,
-  onRemoveLine,
+  onEdit,
+  onOpenEvidence,
 }: BudgetPanelProps) {
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const pending = lines.find((line) => line.id === pendingId);
+  const showEvidence = mode === "detail" && typeof onOpenEvidence === "function";
+  const showEdit = mode === "detail" && canEdit && typeof onEdit === "function";
 
   return (
-    <Panel aria-label="Presupuesto">
-      <Summary>
-        <div>
-          <Term>Asignado</Term>
-          <Detail>{formatCOP(assigned)}</Detail>
-        </div>
-        <div>
-          <Term>Ejecutado</Term>
-          <Detail>{formatCOP(executed)}</Detail>
-        </div>
-        <div>
-          <Term>Porcentaje ejecutado</Term>
-          <Detail>{formatPercent(executedPercent)}</Detail>
-        </div>
-      </Summary>
-      <DataTable
-        caption="Rúbrica"
-        rows={lines}
-        getRowId={(row) => row.id}
-        columns={[
-          { id: "rubric", header: "Rúbrica", cell: (row) => row.rubric },
-          {
-            id: "planned",
-            header: "Planeado",
-            align: "end",
-            cell: (row) => formatCOP(row.planned),
-          },
-          { id: "spent", header: "Ejecutado", align: "end", cell: (row) => formatCOP(row.spent) },
-          {
-            id: "evidence",
-            header: "Evidencia",
-            cell: (row) =>
-              row.evidenceHref && row.evidenceLabel ? (
-                <Link href={row.evidenceHref}>{row.evidenceLabel}</Link>
-              ) : (
-                "—"
-              ),
-          },
-          ...(canEdit
-            ? [
-                {
-                  id: "actions",
-                  header: "Acciones",
-                  cell: (row: BudgetLine) => (
-                    <Button type="button" intent="danger" onClick={() => setPendingId(row.id)}>
-                      Quitar rúbrica
-                    </Button>
-                  ),
-                },
-              ]
-            : []),
-        ]}
-      />
-      <ConfirmDialog
-        open={pendingId !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingId(null);
-        }}
-        title="Quitar rúbrica"
-        description={
-          pending
-            ? `Se quitará «${pending.rubric}» del presupuesto. Esta acción no se puede deshacer desde aquí.`
-            : "Se quitará la rúbrica seleccionada."
-        }
-        confirmLabel="Quitar"
-        onConfirm={() => {
-          if (pendingId) onRemoveLine?.(pendingId);
-          setPendingId(null);
-        }}
-      />
-    </Panel>
+    <S.Panel aria-label="Presupuesto">
+      <S.Header>
+        <S.Summary>
+          <div>
+            <S.Term>Asignado</S.Term>
+            <S.Detail>{formatCOP(assigned)}</S.Detail>
+          </div>
+          <div>
+            <S.Term>Ejecutado</S.Term>
+            <S.Detail>{formatCOP(executed)}</S.Detail>
+          </div>
+          <div>
+            <S.Term>Porcentaje ejecutado</S.Term>
+            <S.Detail>{formatPercent(executedPercent)}</S.Detail>
+          </div>
+        </S.Summary>
+        {showEdit ? (
+          <S.HeaderActions>
+            <Button type="button" intent="secondary" onClick={onEdit}>
+              Editar presupuesto
+            </Button>
+          </S.HeaderActions>
+        ) : null}
+      </S.Header>
+
+      <S.TableScroll role="region" aria-label="Rúbricas del presupuesto" tabIndex={0}>
+        <DataTable
+          caption="Rubro, actividad y ejecución"
+          rows={lines}
+          getRowId={(row) => row.id}
+          columns={[
+            { id: "rubric", header: "Rubro / actividad", cell: (row) => row.rubric },
+            {
+              id: "planned",
+              header: "Asignado",
+              align: "end",
+              cell: (row) => formatCOP(row.planned),
+            },
+            {
+              id: "spent",
+              header: "Ejecución",
+              align: "end",
+              cell: (row) => formatCOP(row.spent),
+            },
+            {
+              id: "status",
+              header: "Estado",
+              cell: (row) => <StatusCell status={row.status} />,
+            },
+            ...(showEvidence
+              ? [
+                  {
+                    id: "evidence",
+                    header: "Evidencia",
+                    cell: (row: BudgetLine) => (
+                      <Button
+                        type="button"
+                        intent="secondary"
+                        onClick={() => onOpenEvidence?.(row.id)}
+                      >
+                        Revisar
+                      </Button>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </S.TableScroll>
+    </S.Panel>
   );
 }

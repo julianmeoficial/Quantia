@@ -7,7 +7,7 @@ export type { AppShellProps } from "./AppShell";
 export { AppHeader } from "./AppHeader";
 export type { AppHeaderCrumb, AppHeaderProps } from "./AppHeader";
 export { BudgetPanel } from "./BudgetPanel";
-export type { BudgetLine, BudgetPanelProps } from "./BudgetPanel";
+export type { BudgetLine, BudgetPanelMode, BudgetPanelProps } from "./BudgetPanel";
 export { DataTable } from "./DataTable";
 export type { DataTableColumn, DataTableProps, DataTableSort } from "./DataTable";
 export { KpiPanel } from "./KpiPanel";

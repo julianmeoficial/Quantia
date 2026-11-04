@@ -335,14 +335,15 @@ export function DesignCompositeSections() {
             executed="800000"
             executedPercent={64}
             canEdit
+            onEdit={() => undefined}
+            onOpenEvidence={() => undefined}
             lines={[
               {
                 id: "b1",
                 rubric: "Materiales",
                 planned: "700000",
                 spent: "640000",
-                evidenceHref: "/design",
-                evidenceLabel: "Factura octubre",
+                status: "missing",
               },
             ]}
           />
