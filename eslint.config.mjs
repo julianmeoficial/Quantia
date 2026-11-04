@@ -17,7 +17,15 @@ const eslintConfig = defineConfig([
     },
   },
   prettier,
-  globalIgnores([".next/**", "out/**", "build/**", "coverage/**", "next-env.d.ts"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "coverage/**",
+    "next-env.d.ts",
+    "lighthouserc.cjs",
+    "e2e/a11y/lhci-puppeteer.cjs",
+  ]),
 ]);
 
 export default eslintConfig;

@@ -175,36 +175,66 @@ function ProjectsListBody() {
 
   if (!allowed) {
     return (
-      <ErrorState
-        variant="forbidden"
-        onRetry={() => router.replace("/")}
-        retryLabel="Ir al inicio"
-      />
+      <S.Page>
+        <S.Header>
+          <S.HeaderText>
+            <S.Title>Proyectos</S.Title>
+          </S.HeaderText>
+        </S.Header>
+        <ErrorState
+          variant="forbidden"
+          onRetry={() => router.replace("/")}
+          retryLabel="Ir al inicio"
+        />
+      </S.Page>
     );
   }
 
   if (status === "error" && error?.kind === "forbidden") {
     return (
-      <ErrorState
-        variant="forbidden"
-        onRetry={() => router.replace("/")}
-        retryLabel="Ir al inicio"
-      />
+      <S.Page>
+        <S.Header>
+          <S.HeaderText>
+            <S.Title>Proyectos</S.Title>
+          </S.HeaderText>
+        </S.Header>
+        <ErrorState
+          variant="forbidden"
+          onRetry={() => router.replace("/")}
+          retryLabel="Ir al inicio"
+        />
+      </S.Page>
     );
   }
 
   if (status === "error" && error?.kind === "rate_limited") {
     return (
-      <ErrorState
-        variant="rate-limit"
-        retryAfterSeconds={error.retryAfterSeconds}
-        onRetry={reload}
-      />
+      <S.Page>
+        <S.Header>
+          <S.HeaderText>
+            <S.Title>Proyectos</S.Title>
+          </S.HeaderText>
+        </S.Header>
+        <ErrorState
+          variant="rate-limit"
+          retryAfterSeconds={error.retryAfterSeconds}
+          onRetry={reload}
+        />
+      </S.Page>
     );
   }
 
   if (status === "error") {
-    return <ErrorState variant="server" onRetry={reload} />;
+    return (
+      <S.Page>
+        <S.Header>
+          <S.HeaderText>
+            <S.Title>Proyectos</S.Title>
+          </S.HeaderText>
+        </S.Header>
+        <ErrorState variant="server" onRetry={reload} />
+      </S.Page>
+    );
   }
 
   const rows = data?.data ?? [];

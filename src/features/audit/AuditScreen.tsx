@@ -42,6 +42,21 @@ const TableScroll = styled.div`
   overflow-x: auto;
 `;
 
+/** Keep filter controls from forcing page-level horizontal scroll at 200% zoom. */
+const FilterStack = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space[12]};
+  width: 100%;
+  min-width: 0;
+
+  & > * {
+    flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+`;
+
 const ALL_ORIGINS = "all" as const;
 
 const ORIGIN_OPTIONS = [
@@ -194,16 +209,18 @@ function AuditBody() {
           </DemoBanner>
 
           <FilterBar searchLabel="Usuario" searchValue="" onSearchChange={() => undefined} disabled>
-            <TextField label="Acción" value="" disabled onChange={() => undefined} />
-            <TextField label="Entidad" value="" disabled onChange={() => undefined} />
-            <Select
-              label="Origen"
-              options={ORIGIN_OPTIONS}
-              value={ALL_ORIGINS}
-              onValueChange={() => undefined}
-              disabled
-            />
-            <TextField label="Rango de fechas" value="" disabled onChange={() => undefined} />
+            <FilterStack>
+              <TextField label="Acción" value="" disabled onChange={() => undefined} />
+              <TextField label="Entidad" value="" disabled onChange={() => undefined} />
+              <Select
+                label="Origen"
+                options={ORIGIN_OPTIONS}
+                value={ALL_ORIGINS}
+                onValueChange={() => undefined}
+                disabled
+              />
+              <TextField label="Rango de fechas" value="" disabled onChange={() => undefined} />
+            </FilterStack>
           </FilterBar>
 
           <EmptyState
@@ -235,23 +252,25 @@ function AuditBody() {
             onClear={chips.length > 0 ? clearFilters : undefined}
             resultCount={filtered.length}
           >
-            <TextField
-              label="Acción"
-              value={actionQuery}
-              onChange={(event) => setActionQuery(event.target.value)}
-            />
-            <TextField
-              label="Entidad"
-              value={entityQuery}
-              onChange={(event) => setEntityQuery(event.target.value)}
-            />
-            <Select
-              label="Origen"
-              options={ORIGIN_OPTIONS}
-              value={origin}
-              onValueChange={setOrigin}
-            />
-            <DateRangePicker label="Rango de fechas" value={range} onChange={setRange} />
+            <FilterStack>
+              <TextField
+                label="Acción"
+                value={actionQuery}
+                onChange={(event) => setActionQuery(event.target.value)}
+              />
+              <TextField
+                label="Entidad"
+                value={entityQuery}
+                onChange={(event) => setEntityQuery(event.target.value)}
+              />
+              <Select
+                label="Origen"
+                options={ORIGIN_OPTIONS}
+                value={origin}
+                onValueChange={setOrigin}
+              />
+              <DateRangePicker label="Rango de fechas" value={range} onChange={setRange} />
+            </FilterStack>
           </FilterBar>
 
           <TableScroll role="region" aria-label="Registro de auditoría" tabIndex={0}>
