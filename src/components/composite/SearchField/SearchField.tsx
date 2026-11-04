@@ -36,6 +36,7 @@ export interface SearchFieldProps {
   placeholder?: string;
   size?: ControlSize;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
 export function SearchField({
@@ -46,8 +47,10 @@ export function SearchField({
   placeholder,
   size = "md",
   isLoading = false,
+  disabled = false,
 }: SearchFieldProps) {
   const id = useId();
+  const isDisabled = disabled || isLoading;
 
   return (
     <Row>
@@ -62,11 +65,11 @@ export function SearchField({
           size={size}
           value={value}
           placeholder={placeholder}
-          disabled={isLoading}
+          disabled={isDisabled}
           onChange={(event) => onChange(event.target.value)}
         />
       </Field>
-      {value ? (
+      {value && !isDisabled ? (
         <IconButton
           accessibleLabel={`Limpiar ${label.toLowerCase()}`}
           icon={<XIcon />}

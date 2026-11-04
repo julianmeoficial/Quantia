@@ -70,6 +70,7 @@ function BudgetBody() {
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/presupuesto", roles);
   const canView = Boolean(user && canViewBudgetDetail(user));
+  // DS-115: edición solo Administrador; Coordinador ve resumen de cartera (no canManageBudget).
   const admin = Boolean(user && isAdmin(user));
   const panelMode = admin ? "detail" : "summary";
 
