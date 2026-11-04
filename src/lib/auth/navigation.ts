@@ -72,11 +72,29 @@ export function sectionLabel(pathname: string): string | null {
 
 export type RouteAccess = "allowed" | "denied" | "unknown";
 
+/** Deep-link route for ADM-02; not listed in NAV_CATALOG until the call contract exists. */
+export function isConvocatoriasPath(pathname: string): boolean {
+  const path = normalizePath(pathname);
+  return path === "/convocatorias" || path.startsWith("/convocatorias/");
+}
+
+/** Segment after `/convocatorias/`, or null when the path is not a call detail URL. */
+export function callRouteId(pathname: string): string | null {
+  const path = normalizePath(pathname);
+  const match = /^\/convocatorias\/([^/]+)$/.exec(path);
+  return match?.[1] ?? null;
+}
+
 export function accessFor(pathname: string, roles: readonly AppRole[]): RouteAccess {
   const path = normalizePath(pathname);
   const entry = NAV_CATALOG.find((item) => item.href === path);
-  if (!entry) return "unknown";
-  return entry.roles.some((role) => roles.includes(role)) ? "allowed" : "denied";
+  if (entry) {
+    return entry.roles.some((role) => roles.includes(role)) ? "allowed" : "denied";
+  }
+  if (isConvocatoriasPath(path)) {
+    return roles.includes("ADMINISTRADOR") ? "allowed" : "denied";
+  }
+  return "unknown";
 }
 
 function normalizePath(pathname: string): string {

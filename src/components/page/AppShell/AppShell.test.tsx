@@ -75,6 +75,36 @@ describe("AppShell", () => {
     expect(sections().getByRole("link", { name: "Usuarios", hidden: true })).toBeInTheDocument();
   });
 
+  it("shows quantia.udc breadcrumb on convocatoria detail for an administrator", () => {
+    renderWithTheme(
+      <AppShell
+        identity={{ displayName: "Marta Herrera", roles: ["ADMINISTRADOR"] }}
+        pathname="/convocatorias/2026-01"
+      >
+        <h1>Convocatoria</h1>
+      </AppShell>,
+    );
+    const crumbs = within(screen.getByRole("navigation", { name: "Migas de pan" }));
+    expect(crumbs.getByRole("link", { name: "quantia.udc" })).toHaveAttribute(
+      "href",
+      "/institucional",
+    );
+    expect(crumbs.getByText("convocatorias/2026-01")).toBeInTheDocument();
+  });
+
+  it("blocks convocatoria deep links for non-administrators", () => {
+    renderWithTheme(
+      <AppShell
+        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"] }}
+        pathname="/convocatorias/2026-01"
+      >
+        <h1>Convocatoria</h1>
+      </AppShell>,
+    );
+    expect(screen.getByText("No tienes permiso para ver esta sección")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Convocatoria" })).not.toBeInTheDocument();
+  });
+
   it("keeps the screen mounted when the session expires", () => {
     renderWithTheme(
       <AppShell

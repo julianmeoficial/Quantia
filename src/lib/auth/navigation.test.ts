@@ -22,8 +22,16 @@ describe("navigation matrix", () => {
   it("denies a known path and ignores an unknown one", () => {
     expect(accessFor("/usuarios", ["INVESTIGADOR"])).toBe("denied");
     expect(canAccess("/usuarios", ["INVESTIGADOR"])).toBe(false);
-    expect(accessFor("/convocatorias", ["ADMINISTRADOR"])).toBe("unknown");
     expect(accessFor("/proyectos/123", ["COORDINADOR"])).toBe("unknown");
     expect(canAccess("/presupuesto", ["ADMINISTRADOR"])).toBe(true);
+  });
+
+  it("allows convocatoria deep links only for administrators", () => {
+    expect(accessFor("/convocatorias", ["ADMINISTRADOR"])).toBe("allowed");
+    expect(accessFor("/convocatorias/2026-01", ["ADMINISTRADOR"])).toBe("allowed");
+    expect(canAccess("/convocatorias/2026-01", ["ADMINISTRADOR"])).toBe(true);
+    expect(accessFor("/convocatorias/2026-01", ["COORDINADOR"])).toBe("denied");
+    expect(accessFor("/convocatorias/2026-01", ["INVESTIGADOR"])).toBe("denied");
+    expect(canAccess("/convocatorias/2026-01", ["INVESTIGADOR"])).toBe(false);
   });
 });

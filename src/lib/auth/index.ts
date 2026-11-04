@@ -1,5 +1,7 @@
 export {
   accessFor,
+  callRouteId,
+  isConvocatoriasPath,
   landing,
   navigationFor,
   primaryRole,
