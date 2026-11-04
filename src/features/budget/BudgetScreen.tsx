@@ -10,12 +10,15 @@ import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/compon
 import { useAuth } from "@/features/auth/AuthProvider";
 import { BUDGET_FILTER_DEFAULTS, budgetFiltersSchema } from "@/features/filters";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
-import { canAccess, canManageBudget, canViewBudgetDetail } from "@/lib/auth";
+import { canAccess, canViewBudgetDetail, isAdmin } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatCOP, formatDate } from "@/lib/format";
 import { useUrlFilters } from "@/lib/url";
 
+import { buildBudgetLines, executionsForItem } from "./buildBudgetLines";
 import { CreateBudgetPanel } from "./CreateBudgetPanel";
+import { EditBudgetPanel } from "./EditBudgetPanel";
+import { EvidenceReviewPanel } from "./EvidenceReviewPanel";
 import * as S from "../tasks/sectionPage.styles";
 import { useProjectBudget } from "./useProjectBudget";
 
@@ -37,6 +40,8 @@ function BudgetBody() {
   const router = useRouter();
   const { identity, user } = useAuth();
   const createTriggerRef = useRef<HTMLSpanElement>(null);
+  const editTriggerRef = useRef<HTMLSpanElement>(null);
+  const evidenceTriggerRef = useRef<HTMLSpanElement>(null);
 
   const { values, setFilters } = useUrlFilters({
     schema: budgetFiltersSchema,
@@ -55,6 +60,8 @@ function BudgetBody() {
   );
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [evidenceItemId, setEvidenceItemId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
     title: "",
@@ -63,7 +70,23 @@ function BudgetBody() {
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/presupuesto", roles);
   const canView = Boolean(user && canViewBudgetDetail(user));
-  const canManage = Boolean(user && selectedProject && canManageBudget(user, selectedProject));
+  const admin = Boolean(user && isAdmin(user));
+  const panelMode = admin ? "detail" : "summary";
+
+  const lines = useMemo(
+    () => (budget ? buildBudgetLines(budget, executions) : []),
+    [budget, executions],
+  );
+
+  const evidenceItem = useMemo(
+    () => budget?.items.find((item) => item.id === evidenceItemId) ?? null,
+    [budget, evidenceItemId],
+  );
+
+  const evidenceExecutions = useMemo(
+    () => (evidenceItemId ? executionsForItem(executions, evidenceItemId) : []),
+    [evidenceItemId, executions],
+  );
 
   const executionColumns = useMemo(
     (): DataTableColumn<BudgetExecutionResponse>[] => [
@@ -134,9 +157,13 @@ function BudgetBody() {
       <S.Header>
         <S.HeaderText>
           <S.Title>Presupuesto</S.Title>
-          <S.Subtitle>Asignación, rúbricas y ejecuciones del proyecto seleccionado.</S.Subtitle>
+          <S.Subtitle>
+            {admin
+              ? "Asignación, rúbricas, ejecuciones y revisión de evidencia del proyecto."
+              : "Resumen de cartera · totales y estado por rúbrica (sin edición)."}
+          </S.Subtitle>
         </S.HeaderText>
-        {canManage && status === "empty" ? (
+        {admin && status === "empty" ? (
           <S.HeaderActions>
             <span ref={createTriggerRef}>
               <Button intent="primary" type="button" onClick={() => setCreateOpen(true)}>
@@ -179,7 +206,7 @@ function BudgetBody() {
           title="Sin presupuesto"
           description="Este proyecto aún no tiene presupuesto registrado."
           action={
-            canManage ? (
+            admin ? (
               <Button intent="primary" type="button" onClick={() => setCreateOpen(true)}>
                 Crear presupuesto
               </Button>
@@ -188,37 +215,47 @@ function BudgetBody() {
         />
       ) : budget ? (
         <>
+          <span ref={editTriggerRef} hidden />
+          <span ref={evidenceTriggerRef} hidden />
           <BudgetPanel
             assigned={budget.totalAmount}
             executed={budget.executedAmount}
             executedPercent={budget.executedPercent}
-            canEdit={false}
-            lines={budget.items.map((item) => ({
-              id: item.id,
-              rubric: item.category,
-              planned: item.plannedAmount,
-              spent: "0",
-            }))}
-          />
-
-          <S.Title as="h2">Ejecuciones</S.Title>
-          <DataTable
-            caption="Ejecuciones presupuestales"
-            columns={executionColumns}
-            rows={executions}
-            getRowId={(row) => row.id}
-            emptyState={
-              <EmptyState
-                kind="no-records"
-                title="Sin ejecuciones"
-                description="Cuando se registren compromisos o pagos aparecerán aquí."
-              />
+            lines={lines}
+            mode={panelMode}
+            canEdit={admin}
+            onEdit={admin ? () => setEditOpen(true) : undefined}
+            onOpenEvidence={
+              admin
+                ? (lineId) => {
+                    setEvidenceItemId(lineId);
+                  }
+                : undefined
             }
           />
+
+          {admin ? (
+            <>
+              <S.Title as="h2">Ejecuciones</S.Title>
+              <DataTable
+                caption="Ejecuciones presupuestales"
+                columns={executionColumns}
+                rows={executions}
+                getRowId={(row) => row.id}
+                emptyState={
+                  <EmptyState
+                    kind="no-records"
+                    title="Sin ejecuciones"
+                    description="Cuando se registren compromisos o pagos aparecerán aquí."
+                  />
+                }
+              />
+            </>
+          ) : null}
         </>
       ) : null}
 
-      {selectedProject ? (
+      {selectedProject && admin ? (
         <CreateBudgetPanel
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -228,6 +265,34 @@ function BudgetBody() {
             setToast({ open: true, title: "Presupuesto creado" });
             reload();
           }}
+        />
+      ) : null}
+
+      {selectedProject && budget && admin ? (
+        <EditBudgetPanel
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          project={selectedProject}
+          budget={budget}
+          triggerRef={editTriggerRef}
+          onSuccess={() => {
+            setToast({ open: true, title: "Presupuesto actualizado" });
+            reload();
+          }}
+        />
+      ) : null}
+
+      {selectedProject && admin ? (
+        <EvidenceReviewPanel
+          open={evidenceItemId !== null}
+          onOpenChange={(open) => {
+            if (!open) setEvidenceItemId(null);
+          }}
+          projectId={selectedProject.id}
+          projectTitle={selectedProject.title}
+          item={evidenceItem}
+          executions={evidenceExecutions}
+          triggerRef={evidenceTriggerRef}
         />
       ) : null}
 
