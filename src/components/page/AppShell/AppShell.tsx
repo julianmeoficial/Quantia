@@ -166,7 +166,7 @@ export function AppShell({
     );
   }
 
-  const items = navigationFor(identity.roles).map((entry) => ({
+  const items = navigationFor(identity.roles, { chatEnabled: true }).map((entry) => ({
     ...entry,
     icon: iconForHref(entry.href),
   }));

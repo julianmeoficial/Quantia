@@ -2,6 +2,12 @@ export { loginWithSession, logoutWithSession, refreshWithSession } from "./auth"
 export type { SessionGrant } from "./auth";
 export { api, buildApiUrl, readRetryAfterSeconds, request, type RequestOptions } from "./client";
 export {
+  createGeneralChatMessage,
+  GENERAL_CHAT_MESSAGE_MAX,
+  listGeneralChatMessages,
+} from "./chat";
+export type { CreateGeneralChatMessageResponse } from "./chat";
+export {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
   deleteProjectDocument,

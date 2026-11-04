@@ -14,4 +14,5 @@ export const queryKeys = {
     ["budget-executions", projectId, params] as const,
   groupDashboard: (params: unknown) => ["group-dashboard", params] as const,
   institutionalOverview: (params: unknown) => ["institutional-overview", params] as const,
+  chatGeneralHistory: ["chat", "general", "messages"] as const,
 } as const;

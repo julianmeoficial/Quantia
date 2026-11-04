@@ -1,9 +1,13 @@
+export { ChatMessage } from "./ChatMessage";
+export type { ChatDeliveryState, ChatMessageProps } from "./ChatMessage";
 export { DateRangePicker } from "./DateRangePicker";
 export type { DateRangePickerProps, DateRangeValue } from "./DateRangePicker";
 export { FileUploader } from "./FileUploader";
 export type { FileUploaderProps, UploadItem } from "./FileUploader";
 export { FilterBar } from "./FilterBar";
 export type { FilterBarProps, FilterChip } from "./FilterBar";
+export { MessageComposer } from "./MessageComposer";
+export type { MessageComposerProps } from "./MessageComposer";
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
 export { ProgressBar } from "./ProgressBar";

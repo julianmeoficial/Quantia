@@ -109,6 +109,19 @@ function ChartIcon(props: IconProps) {
   );
 }
 
+function ChatIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path
+        d="M3 4.5h10v7.5H8L5.5 14v-2H3V4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </Glyph>
+  );
+}
+
 const ICONS: Record<string, (props: IconProps) => ReactNode> = {
   "/mis-tareas": ListIcon,
   "/dashboard": GridIcon,
@@ -119,6 +132,7 @@ const ICONS: Record<string, (props: IconProps) => ReactNode> = {
   "/presupuesto": ChartIcon,
   "/usuarios": UsersIcon,
   "/reportes": ChartIcon,
+  "/chat": ChatIcon,
 };
 
 export function iconForHref(href: string): ReactNode {

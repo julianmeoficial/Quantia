@@ -67,7 +67,13 @@ export function landing(roles: readonly AppRole[]): string | null {
 
 export function sectionLabel(pathname: string): string | null {
   const path = normalizePath(pathname);
+  if (isChatPath(path)) return "Chat";
   return NAV_CATALOG.find((entry) => entry.href === path)?.label ?? null;
+}
+
+/** Shared chat route — shown in nav only when `chatEnabled` is on. */
+export function isChatPath(pathname: string): boolean {
+  return normalizePath(pathname) === "/chat";
 }
 
 export type RouteAccess = "allowed" | "denied" | "unknown";
@@ -96,6 +102,9 @@ export function accessFor(pathname: string, roles: readonly AppRole[]): RouteAcc
   const entry = NAV_CATALOG.find((item) => item.href === path);
   if (entry) {
     return entry.roles.some((role) => roles.includes(role)) ? "allowed" : "denied";
+  }
+  if (isChatPath(path)) {
+    return roles.length > 0 ? "allowed" : "denied";
   }
   if (isConvocatoriasPath(path) || isAuditoriaPath(path)) {
     return roles.includes("ADMINISTRADOR") ? "allowed" : "denied";

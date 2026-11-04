@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatCOP } from "./currency";
-import { formatDate, toApiDate } from "./date";
+import { formatDate, formatTime, toApiDate } from "./date";
 import { compareMoney, rubricExecutionStatus, sumMoney } from "./money";
 import { formatPercent } from "./percent";
 import { formatRelativeDue } from "./relative-due";
@@ -30,6 +30,11 @@ describe("format", () => {
   it("formats a Bogota calendar date", () => {
     expect(formatDate("2026-10-15T05:00:00.000Z")).toBe("15/10/2026");
     expect(formatDate("nope")).toBe("—");
+  });
+
+  it("formats Bogota clock time as HH:mm", () => {
+    expect(formatTime("2026-10-15T20:05:00.000Z")).toBe("15:05");
+    expect(formatTime("nope")).toBe("—");
   });
 
   it("builds an API date from DD/MM/AAAA at Bogota midnight", () => {

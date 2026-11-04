@@ -10,13 +10,23 @@ describe("navigation matrix", () => {
     expect(landing([])).toBeNull();
   });
 
-  it("unions roles and keeps chat off", () => {
+  it("unions roles and keeps chat off by default", () => {
     const labels = navigationFor(["COORDINADOR", "ADMINISTRADOR"]).map((item) => item.label);
     expect(labels).toContain("Dashboard");
     expect(labels).toContain("Institucional");
     expect(labels).toContain("Usuarios");
     expect(labels).not.toContain("Mis tareas");
     expect(labels).not.toContain("Chat");
+  });
+
+  it("adds Chat when chatEnabled is on", () => {
+    const labels = navigationFor(["INVESTIGADOR"], { chatEnabled: true }).map((item) => item.label);
+    expect(labels).toContain("Chat");
+    expect(accessFor("/chat", ["INVESTIGADOR"])).toBe("allowed");
+    expect(accessFor("/chat", ["COORDINADOR"])).toBe("allowed");
+    expect(accessFor("/chat", ["ADMINISTRADOR"])).toBe("allowed");
+    expect(accessFor("/chat", [])).toBe("denied");
+    expect(canAccess("/chat", ["INVESTIGADOR"])).toBe(true);
   });
 
   it("denies a known path and ignores an unknown one", () => {
