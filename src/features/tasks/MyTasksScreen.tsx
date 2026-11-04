@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { SyncEntityType } from "@quantia/contracts";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
 
 import { Badge, Button, Select, TASK_STATUS_PRESENTATION, Tooltip } from "@/components/base";
 import { TaskRow } from "@/components/composite";
@@ -16,6 +17,7 @@ import {
 } from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { RegisterProgressPanel } from "@/features/progress";
+import { useRetrySync } from "@/features/sync";
 import { canAccess } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate, formatRelativeDue } from "@/lib/format";
@@ -256,6 +258,7 @@ function MyTasksBody() {
   const searchParams = useSearchParams();
   const { identity } = useAuth();
   const { status, data, error, reload } = useMyTasks();
+  const { canRetry, isRetrying, retry } = useRetrySync();
   const [registerOpen, setRegisterOpen] = useState(false);
   const [registerTaskId, setRegisterTaskId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
@@ -385,6 +388,7 @@ function MyTasksBody() {
   const isEmptyFiltered = filteredTasks.length === 0;
   const filtersActive = appliedProjectId !== ALL_PROJECTS || appliedStatus !== PENDING_STATUS;
   const sync = syncFromTasks(allTasks);
+  const failedTask = allTasks.find((task) => task.syncStatus === "FAILED");
 
   return (
     <S.Page>
@@ -410,7 +414,34 @@ function MyTasksBody() {
         </S.PartialNotice>
       ) : null}
 
-      {sync !== "synced" ? <SyncStatus status={sync} persisted canRetry={false} /> : null}
+      {sync !== "synced" ? (
+        <SyncStatus
+          status={sync}
+          persisted
+          entity="task"
+          canRetry={canRetry && sync === "failed" && Boolean(failedTask)}
+          isLoading={isRetrying}
+          onRetry={() => {
+            if (!failedTask) return;
+            void (async () => {
+              const ok = await retry({
+                entityType: SyncEntityType.TASK,
+                id: failedTask.id,
+                projectId: failedTask.projectId,
+              });
+              if (ok) {
+                reload();
+                return;
+              }
+              setToast({
+                open: true,
+                title: "No se pudo reintentar la sincronización",
+                description: "Vuelve a intentarlo en unos segundos.",
+              });
+            })();
+          }}
+        />
+      ) : null}
 
       {!isEmptyAll ? (
         <S.Toolbar>

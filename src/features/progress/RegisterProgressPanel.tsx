@@ -1,11 +1,12 @@
 "use client";
 
-import type { ProgressResponse } from "@quantia/contracts";
+import { SyncEntityType, type ProgressResponse } from "@quantia/contracts";
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
 
 import { Button, Select, TextArea, TextField } from "@/components/base";
 import { FileUploader, type UploadItem } from "@/components/composite";
 import { Sheet, SyncStatus, type SyncStatusValue } from "@/components/system";
+import { useRetrySync } from "@/features/sync";
 import {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
@@ -69,6 +70,7 @@ export function RegisterProgressPanel({
   triggerRef,
 }: RegisterProgressPanelProps) {
   const formId = useId();
+  const { canRetry, isRetrying, retry } = useRetrySync();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [taskId, setTaskId] = useState(NONE_TASK);
@@ -355,7 +357,24 @@ export function RegisterProgressPanel({
           <S.SavedMessage role="status">
             Avance guardado. Puedes seguir trabajando mientras se sincroniza.
           </S.SavedMessage>
-          <SyncStatus status={mapSync(saved.syncStatus)} persisted />
+          <SyncStatus
+            status={mapSync(saved.syncStatus)}
+            persisted
+            entity="progress"
+            lastSyncedAt={saved.syncStatus === "SYNCED" ? saved.updatedAt : undefined}
+            canRetry={canRetry && saved.syncStatus === "FAILED"}
+            isLoading={isRetrying}
+            onRetry={() => {
+              void retry({
+                entityType: SyncEntityType.PROGRESS,
+                id: saved.id,
+                projectId: saved.projectId,
+              }).then((ok) => {
+                if (!ok) return;
+                setSaved((prev) => (prev ? { ...prev, syncStatus: "PENDING" } : prev));
+              });
+            }}
+          />
         </S.SavedStack>
       ) : (
         <S.Form

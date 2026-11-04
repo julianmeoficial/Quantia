@@ -1,13 +1,14 @@
 "use client";
 
-import type {
-  BudgetResponse,
-  DocumentResponse,
-  ProgressResponse,
-  ProjectResponse,
-  TaskResponse,
-  TaskStatus,
-  UserResponse,
+import {
+  SyncEntityType,
+  type BudgetResponse,
+  type DocumentResponse,
+  type ProgressResponse,
+  type ProjectResponse,
+  type TaskResponse,
+  type TaskStatus,
+  type UserResponse,
 } from "@quantia/contracts";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,9 +25,17 @@ import {
 import { FileUploader, TaskRow, type UploadItem } from "@/components/composite";
 import { ActivityTimeline, DataTable, type DataTableColumn } from "@/components/page";
 import type { SyncStatusValue } from "@/components/system";
-import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/components/system";
+import {
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  SyncStatus,
+  Toast,
+  ToastProvider,
+} from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { RegisterProgressPanel } from "@/features/progress";
+import { useRetrySync } from "@/features/sync";
 import {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
@@ -82,36 +91,20 @@ function mimeLabel(mimeType: string): string {
   return mimeType;
 }
 
-function workspaceSyncBanner(
+function workspaceSyncAggregate(
   project: ProjectResponse,
   tasks: TaskResponse[] | null,
   progress: ProgressResponse[] | null,
-): { tone: "info" | "success" | "warning"; message: string } | null {
+): SyncStatusValue | null {
   const statuses = [
     project.syncStatus,
     ...(tasks?.map((task) => task.syncStatus) ?? []),
     ...(progress?.map((entry) => entry.syncStatus) ?? []),
   ];
-  if (statuses.some((status) => status === "FAILED")) {
-    return {
-      tone: "warning",
-      message:
-        "Hay datos guardados que no se pudieron sincronizar con Notion. Puedes seguir trabajando en Quantia.",
-    };
-  }
-  if (statuses.some((status) => status === "PENDING")) {
-    return {
-      tone: "info",
-      message: "Sincronizando cambios con Notion…",
-    };
-  }
-  if (tasks || progress) {
-    return {
-      tone: "success",
-      message: "Los cambios están sincronizados con Notion.",
-    };
-  }
-  return null;
+  if (statuses.some((status) => status === "FAILED")) return "failed";
+  if (statuses.some((status) => status === "PENDING")) return "pending";
+  if (tasks || progress) return "synced";
+  return mapSync(project.syncStatus);
 }
 
 export interface ProjectWorkspaceScreenProps {
@@ -131,6 +124,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const searchParams = useSearchParams();
   const tab = parseWorkspaceTab(searchParams.get("tab"));
   const { user } = useAuth();
+  const { canRetry, isRetrying, retry } = useRetrySync();
+  const [retryingProgressId, setRetryingProgressId] = useState<string | null>(null);
 
   const {
     boot,
@@ -408,7 +403,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
 
   const statusPresentation = PROJECT_STATUS_PRESENTATION[project.status];
   const StatusIcon = statusPresentation.icon;
-  const syncBanner = workspaceSyncBanner(project, tasks.data, progress.data);
+  const syncAggregate = workspaceSyncAggregate(project, tasks.data, progress.data);
 
   const documentColumns: DataTableColumn<DocumentResponse>[] = [
     {
@@ -459,6 +454,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const timelineItems =
     progress.data?.map((entry) => {
       const evidence = entry.evidenceLinks.find((link) => /^https?:\/\//i.test(link));
+      const entrySync = mapSync(entry.syncStatus);
       return {
         id: entry.id,
         at: entry.recordedAt,
@@ -466,7 +462,29 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         text: entry.title,
         evidenceHref: evidence,
         evidenceLabel: evidence ? "Ver evidencia" : undefined,
-        syncStatus: mapSync(entry.syncStatus),
+        syncStatus: entrySync,
+        lastSyncedAt: entry.syncStatus === "SYNCED" ? entry.updatedAt : undefined,
+        canRetrySync: canRetry && entrySync === "failed",
+        isRetryingSync: retryingProgressId === entry.id && isRetrying,
+        onRetrySync: () => {
+          setRetryingProgressId(entry.id);
+          void retry({
+            entityType: SyncEntityType.PROGRESS,
+            id: entry.id,
+            projectId,
+          }).then((ok) => {
+            setRetryingProgressId(null);
+            if (ok) reloadProgress();
+            else {
+              setToast({
+                open: true,
+                title: "No se pudo reintentar la sincronización",
+                description: "Vuelve a intentarlo en unos segundos.",
+                tone: "danger",
+              });
+            }
+          });
+        },
       };
     }) ?? [];
 
@@ -762,15 +780,41 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           </S.BannerText>
         </S.Banner>
       ) : null}
-      {syncBanner && syncBanner.tone !== "success" ? (
-        <S.Banner $tone={syncBanner.tone} role="status">
-          <S.BannerText>{syncBanner.message}</S.BannerText>
-        </S.Banner>
+      {syncAggregate && syncAggregate !== "synced" ? (
+        <SyncStatus
+          status={syncAggregate}
+          persisted
+          entity="project"
+          canRetry={canRetry && syncAggregate === "failed"}
+          isLoading={isRetrying && retryingProgressId === null}
+          onRetry={() => {
+            void retry({
+              entityType: SyncEntityType.PROJECT,
+              id: projectId,
+            }).then((ok) => {
+              if (ok) {
+                reloadProject();
+                reloadTasks();
+                reloadProgress();
+                return;
+              }
+              setToast({
+                open: true,
+                title: "No se pudo reintentar la sincronización",
+                description: "Vuelve a intentarlo en unos segundos.",
+                tone: "danger",
+              });
+            });
+          }}
+        />
       ) : null}
-      {syncBanner?.tone === "success" && (tab === "bitacora" || tab === "tareas") ? (
-        <S.Banner $tone="success" role="status">
-          <S.BannerText>{syncBanner.message}</S.BannerText>
-        </S.Banner>
+      {syncAggregate === "synced" && (tab === "bitacora" || tab === "tareas") ? (
+        <SyncStatus
+          status="synced"
+          persisted
+          entity="project"
+          lastSyncedAt={project.syncStatus === "SYNCED" ? project.updatedAt : undefined}
+        />
       ) : null}
 
       <Tabs label="Secciones del proyecto" value={tab} onValueChange={setTab} items={tabItems} />

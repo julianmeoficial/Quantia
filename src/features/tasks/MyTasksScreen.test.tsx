@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { ThemeProvider } from "styled-components";
@@ -8,7 +9,14 @@ import { theme } from "@/theme";
 import { MyTasksScreen } from "./MyTasksScreen";
 
 function renderScreen(ui: ReactElement) {
-  return render(<ThemeProvider theme={theme}>{ui}</ThemeProvider>);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <ThemeProvider theme={theme}>{ui}</ThemeProvider>
+    </QueryClientProvider>,
+  );
 }
 
 const reload = vi.fn();

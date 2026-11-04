@@ -1,11 +1,14 @@
 "use client";
 
-import { Button } from "@/components/base";
+import { Button, Tooltip } from "@/components/base";
 import { AlertIcon, CheckCircleIcon, SpinnerIcon } from "@/components/base/icons";
+import { formatDate } from "@/lib/format";
 
 import * as S from "./SyncStatus.styles";
 
 export type SyncStatusValue = "pending" | "synced" | "failed";
+
+export type SyncStatusEntity = "project" | "task" | "progress";
 
 export interface SyncStatusProps {
   status: SyncStatusValue;
@@ -14,6 +17,33 @@ export interface SyncStatusProps {
   canRetry?: boolean;
   onRetry?: () => void;
   isLoading?: boolean;
+  /** Drives failed-state copy; defaults to progress for backwards compatibility. */
+  entity?: SyncStatusEntity;
+  /** ISO timestamp for the tooltip when the last sync time is known. */
+  lastSyncedAt?: string;
+}
+
+function failedLabel(entity: SyncStatusEntity): string {
+  if (entity === "project") {
+    return "El proyecto está guardado, pero no se pudo sincronizar con Notion";
+  }
+  if (entity === "task") {
+    return "La tarea está guardada, pero no se pudo sincronizar con Notion";
+  }
+  return "El avance está guardado, pero no se pudo sincronizar con Notion";
+}
+
+function tooltipFor(status: SyncStatusValue, lastSyncedAt: string | undefined): string {
+  if (lastSyncedAt) {
+    return `Última sincronización: ${formatDate(lastSyncedAt, { withTime: true })}`;
+  }
+  if (status === "pending") {
+    return "Guardado en Quantia; pendiente de Notion";
+  }
+  if (status === "failed") {
+    return "Guardado en Quantia; la sincronización con Notion falló";
+  }
+  return "Sincronizado con Notion";
 }
 
 export function SyncStatus({
@@ -22,13 +52,19 @@ export function SyncStatus({
   canRetry = false,
   onRetry,
   isLoading = false,
+  entity = "progress",
+  lastSyncedAt,
 }: SyncStatusProps) {
+  const tip = tooltipFor(status, lastSyncedAt);
+
   if (status === "synced") {
     return (
       <S.Root aria-live="polite" data-status="synced">
-        <S.IconSlot data-tone="success" aria-hidden>
-          <CheckCircleIcon />
-        </S.IconSlot>
+        <Tooltip content={tip}>
+          <S.IconSlot type="button" data-tone="success" aria-label={tip}>
+            <CheckCircleIcon />
+          </S.IconSlot>
+        </Tooltip>
         <S.Label>Sincronizado con Notion</S.Label>
       </S.Root>
     );
@@ -38,9 +74,11 @@ export function SyncStatus({
     if (!persisted) return null;
     return (
       <S.Root aria-live="polite" data-status="pending">
-        <S.IconSlot data-tone="info" aria-hidden>
-          <SpinnerIcon />
-        </S.IconSlot>
+        <Tooltip content={tip}>
+          <S.IconSlot type="button" data-tone="info" aria-label={tip}>
+            <SpinnerIcon />
+          </S.IconSlot>
+        </Tooltip>
         <S.Label>Guardado. Sincronizando con Notion</S.Label>
       </S.Root>
     );
@@ -48,10 +86,12 @@ export function SyncStatus({
 
   return (
     <S.Root role="status" aria-live="polite" data-status="failed">
-      <S.IconSlot data-tone="danger" aria-hidden>
-        <AlertIcon />
-      </S.IconSlot>
-      <S.Label>El avance está guardado, pero no se pudo sincronizar con Notion</S.Label>
+      <Tooltip content={tip}>
+        <S.IconSlot type="button" data-tone="danger" aria-label={tip}>
+          <AlertIcon />
+        </S.IconSlot>
+      </Tooltip>
+      <S.Label>{failedLabel(entity)}</S.Label>
       {canRetry && onRetry ? (
         <Button intent="ghost" size="md" onClick={onRetry} isLoading={isLoading}>
           Reintentar
