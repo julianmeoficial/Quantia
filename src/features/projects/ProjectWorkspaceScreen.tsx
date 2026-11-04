@@ -694,9 +694,19 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
             >
               Cambiar fecha
             </Button>
+            <Link href={`/reportes?projectId=${projectId}`}>Generar reporte</Link>
           </S.DecisionActions>
         </S.RiskCard>
       </S.RiskGrid>
+
+      <S.PrioritySection aria-labelledby="project-comments-heading">
+        <S.PriorityTitle id="project-comments-heading">Comentarios</S.PriorityTitle>
+        <EmptyState
+          kind="no-records"
+          title="Comentarios no disponibles"
+          description="Esta función estará disponible cuando el contrato de la API lo permita. Las menciones tampoco están expuestas aún."
+        />
+      </S.PrioritySection>
 
       {priorityTask ? (
         <S.PrioritySection aria-labelledby="priority-task-heading">

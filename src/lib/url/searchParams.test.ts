@@ -64,14 +64,14 @@ describe("fromSearchParams", () => {
     const good = fromSearchParams(
       new URLSearchParams("projectId=550e8400-e29b-41d4-a716-446655440000"),
       reportsFiltersSchema,
-      { projectId: "" },
+      { projectId: "", kind: "" },
     );
     expect(good.projectId).toBe("550e8400-e29b-41d4-a716-446655440000");
 
     const bad = fromSearchParams(
       new URLSearchParams("projectId=not-a-uuid"),
       reportsFiltersSchema,
-      { projectId: "" },
+      { projectId: "", kind: "" },
     );
     expect(bad.projectId).toBe("");
   });

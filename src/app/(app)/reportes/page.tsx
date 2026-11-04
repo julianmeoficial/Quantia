@@ -1,5 +1,5 @@
-import { SectionStub } from "../section-stub";
+import { ReportsScreen } from "@/features/reports/ReportsScreen";
 
 export default function ReportesPage() {
-  return <SectionStub title="Reportes" />;
+  return <ReportsScreen />;
 }

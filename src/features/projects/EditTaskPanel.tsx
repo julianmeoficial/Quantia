@@ -4,7 +4,7 @@ import type { ProjectResponse, TaskResponse, UserResponse } from "@quantia/contr
 import { useId, useState, type RefObject } from "react";
 
 import { Button, Select, TextField } from "@/components/base";
-import { Sheet } from "@/components/system";
+import { ConfirmDialog, Sheet } from "@/components/system";
 import { updateProjectTask } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
 import { formatDate, toApiDate } from "@/lib/format";
@@ -56,29 +56,43 @@ function EditTaskForm({
   const [dueDate, setDueDate] = useState(toDisplayDate(task.dueDate));
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingBody, setPendingBody] = useState<{
+    assigneeId?: string;
+    dueDate?: string;
+  } | null>(null);
 
-  const handleSubmit = async () => {
+  const validateAndRequestConfirm = () => {
+    setError(null);
+    const body: { assigneeId?: string; dueDate?: string } = {};
+    if (assigneeId) body.assigneeId = assigneeId;
+    if (dueDate.trim()) {
+      const apiDue = toApiDate(dueDate.trim());
+      if (!apiDue) {
+        setError("Ingresa una fecha con formato DD/MM/AAAA.");
+        document.getElementById(dueId)?.focus();
+        return;
+      }
+      body.dueDate = apiDue;
+    }
+    setPendingBody(body);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!pendingBody) return;
     setIsSaving(true);
     setError(null);
     try {
-      const body: { assigneeId?: string; dueDate?: string } = {};
-      if (assigneeId) body.assigneeId = assigneeId;
-      if (dueDate.trim()) {
-        const apiDue = toApiDate(dueDate.trim());
-        if (!apiDue) {
-          setError("Ingresa una fecha con formato DD/MM/AAAA.");
-          setIsSaving(false);
-          document.getElementById(dueId)?.focus();
-          return;
-        }
-        body.dueDate = apiDue;
-      }
-
-      const updated = await updateProjectTask(project.id, task.id, body);
+      const updated = await updateProjectTask(project.id, task.id, pendingBody);
+      setConfirmOpen(false);
+      setPendingBody(null);
+      setIsSaving(false);
       onOpenChange(false);
       onSuccess?.(updated);
     } catch (cause: unknown) {
       const apiError = cause instanceof ApiError ? cause : new ApiError("unknown", null);
+      setConfirmOpen(false);
       if (apiError.kind === "forbidden") {
         setError("No tienes permiso para editar esta tarea.");
       } else if (apiError.kind === "rate_limited") {
@@ -91,41 +105,58 @@ function EditTaskForm({
   };
 
   return (
-    <S.Form
-      onSubmit={(event) => {
-        event.preventDefault();
-        void handleSubmit();
-      }}
-    >
-      <Select
-        label="Responsable"
-        options={[{ value: "", label: "Sin asignar" }, ...memberOptions(project, me)]}
-        value={assigneeId}
-        onValueChange={setAssigneeId}
+    <>
+      <S.Form
+        onSubmit={(event) => {
+          event.preventDefault();
+          validateAndRequestConfirm();
+        }}
+      >
+        <Select
+          label="Responsable"
+          options={[{ value: "", label: "Sin asignar" }, ...memberOptions(project, me)]}
+          value={assigneeId}
+          onValueChange={setAssigneeId}
+        />
+        <TextField
+          id={dueId}
+          label="Fecha límite"
+          value={dueDate}
+          onChange={(event) => setDueDate(event.target.value)}
+          placeholder="Ej.: 15/10/2026"
+          autoFocus={focusField === "dueDate"}
+        />
+        {error ? <S.FormError role="alert">{error}</S.FormError> : null}
+        <S.FormActions>
+          <Button
+            intent="secondary"
+            type="button"
+            disabled={isSaving}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancelar
+          </Button>
+          <Button intent="primary" type="submit" isLoading={isSaving}>
+            Guardar
+          </Button>
+        </S.FormActions>
+      </S.Form>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!isSaving) setConfirmOpen(open);
+        }}
+        title="Confirmar cambios en la tarea"
+        description="Se actualizará el responsable y/o la fecha límite en el servidor. Si falla, se mantienen los valores actuales."
+        confirmLabel="Confirmar"
+        intent="primary"
+        isLoading={isSaving}
+        onConfirm={() => {
+          void handleConfirm();
+        }}
       />
-      <TextField
-        id={dueId}
-        label="Fecha límite"
-        value={dueDate}
-        onChange={(event) => setDueDate(event.target.value)}
-        placeholder="Ej.: 15/10/2026"
-        autoFocus={focusField === "dueDate"}
-      />
-      {error ? <S.FormError role="alert">{error}</S.FormError> : null}
-      <S.FormActions>
-        <Button
-          intent="secondary"
-          type="button"
-          disabled={isSaving}
-          onClick={() => onOpenChange(false)}
-        >
-          Cancelar
-        </Button>
-        <Button intent="primary" type="submit" isLoading={isSaving}>
-          Guardar
-        </Button>
-      </S.FormActions>
-    </S.Form>
+    </>
   );
 }
 
@@ -144,7 +175,7 @@ export function EditTaskPanel({
       open={open}
       onOpenChange={onOpenChange}
       title={task ? `Editar · ${task.title}` : "Editar tarea"}
-      description="Ajusta responsable o fecha límite. Los cambios se guardan en el servidor."
+      description="Ajusta responsable o fecha límite. Los cambios se confirman antes de guardarse."
       triggerRef={triggerRef}
     >
       {open && task ? (
