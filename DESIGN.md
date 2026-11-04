@@ -442,7 +442,7 @@ Postgres persistence and Notion synchronization are separate outcomes. Never rep
 | WebSocket disconnected | ConnectionStatus: "Datos posiblemente desactualizados"                  | Automatic reconnect and supported manual reconnect | Don't claim offline edits are saved without backend confirmation |
 
 Additional action lifecycle: saving uses isLoading and prevents duplicate submission; report completion may use a Toast with "Descargar" and real signed URL expiry. These complement the ten-state table, not replace empty/error cases.
-Reuse existing event contracts: tarea.actualizada, avance.registrado, proyecto.retrasado, presupuesto.ejecucion-baja, reporte.completado, sync.failed. Do not rename events to match UI labels.
+Reuse existing realtime event contracts only: tarea.actualizada, avance.registrado, proyecto.retrasado, presupuesto.ejecucion-baja. Do not rename events to match UI labels. Report completion uses REST polling (no `reporte.completado`); Notion sync failure uses entity `syncStatus` (no `sync.failed` socket). See `.cursor/docs/api-connection.md`.
 Hide unauthorized navigation, but never treat hidden UI as authorization. Investigator access follows project membership; coordinator access follows assigned portfolio; administrator access follows institutional scope. Coordinator audit access remains subject to explicit approval.
 
 ### 11.6 Domain Formatting and Microcopy
@@ -484,7 +484,7 @@ Postgres persistence and Notion synchronization are separate outcomes. Never rep
 | Socket disconnected      | Data-may-be-outdated banner                                       | Automatic reconnect and supported manual action   |
 | Live update              | Brief local highlight                                             | Do not steal focus or reorder under the pointer   |
 
-Reuse existing event contracts: tarea.actualizada, avance.registrado, proyecto.retrasado, presupuesto.ejecucion-baja, reporte.completado, sync.failed. Do not rename events to match UI labels.
+Reuse existing realtime event contracts only: tarea.actualizada, avance.registrado, proyecto.retrasado, presupuesto.ejecucion-baja. Do not rename events to match UI labels. Report completion uses REST polling (no `reporte.completado`); Notion sync failure uses entity `syncStatus` (no `sync.failed` socket). See `.cursor/docs/api-connection.md`.
 Hide unauthorized navigation, but never treat hidden UI as authorization. Investigator access follows project membership; coordinator access follows assigned portfolio; administrator access follows institutional scope. Coordinator audit access remains subject to explicit approval.
 
 ## 12. Motion and Microcopy

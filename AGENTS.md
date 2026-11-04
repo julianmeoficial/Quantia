@@ -16,7 +16,8 @@ Code in English; UI copy in Spanish.
 2. `DESIGN.md` — tokens and registered components (before ANY UI work).
 3. `.cursor/docs/SCREENS.md` — screen inventory, routes, roles and composition blueprints.
 4. `.cursor/docs/frontend-conventions.md` — folders, Figma → code, Git/PR, Definition of Done, env vars.
-5. `.cursor/rules/*.mdc` — only the rule whose globs match the area you touch:
+5. `.cursor/docs/api-connection.md` — frontend↔API connection (HTTP, session, sockets, sync, reports, errors / F3).
+6. `.cursor/rules/*.mdc` — only the rule whose globs match the area you touch:
    - `ui-design-system.mdc` → `src/components/**`, `src/theme/**`, `*.styles.ts` (then read `DESIGN.md`)
    - `accessibility-ux.mdc` → `src/app/**`, `src/components/**`
    - `api-integration.mdc` → `src/lib/**`, `src/features/**`, `src/app/**`
