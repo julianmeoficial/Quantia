@@ -30,6 +30,7 @@ import {
   publishToken,
   startAuthChannel,
 } from "@/lib/auth/channel";
+import { clearSessionReports } from "@/features/reports/sessionReportsStore";
 import { clearDrafts } from "@/lib/auth/drafts";
 
 export type AuthStatus = "booting" | "authenticated" | "anonymous" | "sessionExpired";
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const dropSession = useCallback(
     (options?: { keepDrafts?: boolean }) => {
       if (!options?.keepDrafts) clearDrafts();
+      clearSessionReports();
       setAccessToken(null);
       setUser(null);
       setStatus("anonymous");
