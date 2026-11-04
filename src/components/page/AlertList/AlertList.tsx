@@ -40,18 +40,22 @@ export interface AlertListProps {
   items: AlertListItem[];
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Transient highlight (e.g. realtime) — does not reorder the list. */
+  highlightedIds?: readonly string[];
 }
 
 export function AlertList({
   items,
   emptyTitle = "Sin alertas",
   emptyDescription = "No hay avisos en este momento.",
+  highlightedIds = [],
 }: AlertListProps) {
   if (items.length === 0) {
     return <EmptyState kind="no-records" title={emptyTitle} description={emptyDescription} />;
   }
 
   const ordered = [...items].sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
+  const highlighted = new Set(highlightedIds);
 
   return (
     <S.List aria-label="Alertas">
@@ -59,7 +63,7 @@ export function AlertList({
         const presentation = PRESENTATION[item.severity];
         const Icon = presentation.icon;
         return (
-          <S.Item key={item.id}>
+          <S.Item key={item.id} data-highlighted={highlighted.has(item.id) ? "true" : undefined}>
             <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />
             <S.Title>{item.title}</S.Title>
             <S.Text>{item.interpretation}</S.Text>
