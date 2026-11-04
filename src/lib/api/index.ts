@@ -11,8 +11,15 @@ export {
 } from "./documents";
 export type { UploadDocumentOptions } from "./documents";
 export { ApiError, type ApiErrorKind } from "./errors";
+export {
+  createBudgetExecution,
+  createProjectBudget,
+  getProjectBudget,
+  listBudgetExecutions,
+  updateProjectBudget,
+} from "./budget";
 export { createProjectProgress, getProjectProgress, listProjectProgress } from "./progress";
-export { getProject, listProjects } from "./projects";
+export { createProject, deleteProject, getProject, listProjects, updateProject } from "./projects";
 export {
   configureRefresh,
   expireSession,
@@ -22,4 +29,4 @@ export {
   setAccessToken,
 } from "./session";
 export { getProjectTask, listProjectTasks, updateProjectTask } from "./tasks";
-export { getMe } from "./users";
+export { getMe, searchUserDirectory } from "./users";

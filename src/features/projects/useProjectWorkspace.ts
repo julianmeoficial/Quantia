@@ -89,7 +89,7 @@ export function useProjectWorkspace(projectId: string, tab: WorkspaceTab) {
   }, [authStatus, projectId, bootTick]);
 
   useEffect(() => {
-    if (boot.status !== "ready" || tab !== "tareas") return;
+    if (boot.status !== "ready") return;
     let cancelled = false;
 
     void (async () => {
@@ -121,7 +121,7 @@ export function useProjectWorkspace(projectId: string, tab: WorkspaceTab) {
     return () => {
       cancelled = true;
     };
-  }, [boot.status, projectId, tab, tasksTick]);
+  }, [boot.status, projectId, tasksTick]);
 
   useEffect(() => {
     if (boot.status !== "ready" || tab !== "bitacora") return;

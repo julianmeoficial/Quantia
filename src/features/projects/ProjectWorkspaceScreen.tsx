@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  BudgetResponse,
   DocumentResponse,
   ProgressResponse,
   ProjectResponse,
@@ -9,13 +10,15 @@ import type {
   UserResponse,
 } from "@quantia/contracts";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Badge,
   Button,
   DOCUMENT_STATUS_PRESENTATION,
+  Link,
   PROJECT_STATUS_PRESENTATION,
+  TASK_STATUS_PRESENTATION,
   Tabs,
 } from "@/components/base";
 import { FileUploader, TaskRow, type UploadItem } from "@/components/composite";
@@ -29,14 +32,23 @@ import {
   DOCUMENT_MAX_BYTES,
   deleteProjectDocument,
   getDocumentDownload,
+  getProjectBudget,
   updateProjectTask,
   uploadProjectDocument,
 } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
-import { canCreateProgress, canDeleteDocument, canEditTask, landing } from "@/lib/auth";
-import { formatDate } from "@/lib/format";
+import {
+  canCreateProgress,
+  canDeleteDocument,
+  canEditTask,
+  canViewBudgetDetail,
+  landing,
+} from "@/lib/auth";
+import { formatDate, formatPercent } from "@/lib/format";
 
+import { EditTaskPanel } from "./EditTaskPanel";
 import * as S from "./ProjectWorkspaceScreen.styles";
+import { buildRiskComparison, pickPriorityTask, progressFromTasks } from "./projectRisk";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { WORKSPACE_TAB_LABEL, parseWorkspaceTab, type WorkspaceTab } from "./workspaceTab";
 
@@ -135,14 +147,27 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   } = useProjectWorkspace(projectId, tab);
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
+  const [toast, setToast] = useState<{
+    open: boolean;
+    title: string;
+    description?: string;
+    tone?: "danger" | "success" | "neutral";
+  }>({
     open: false,
     title: "",
+    tone: "danger",
   });
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const registerTriggerRef = useRef<HTMLSpanElement>(null);
+  const manageTaskTriggerRef = useRef<HTMLSpanElement>(null);
+  const [editTaskOpen, setEditTaskOpen] = useState(false);
+  const [editFocus, setEditFocus] = useState<"assignee" | "dueDate">("dueDate");
+  const [budget, setBudget] = useState<BudgetResponse | null>(null);
+  const [budgetStatus, setBudgetStatus] = useState<"idle" | "loading" | "ready" | "missing">(
+    "idle",
+  );
 
   const setTab = useCallback(
     (next: string) => {
@@ -168,6 +193,52 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const project = boot.status === "ready" ? boot.project : null;
   const allowProgress = user && project ? canCreateProgress(user, project) : false;
   const allowDeleteDoc = user && project ? canDeleteDocument(user, project) : false;
+  const allowBudget = Boolean(user && canViewBudgetDetail(user));
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      if (!project || !allowBudget) {
+        setBudget(null);
+        setBudgetStatus("idle");
+        return;
+      }
+      setBudgetStatus("loading");
+      try {
+        const result = await getProjectBudget(projectId);
+        if (cancelled) return;
+        setBudget(result);
+        setBudgetStatus("ready");
+      } catch (cause: unknown) {
+        if (cancelled) return;
+        setBudget(null);
+        setBudgetStatus("missing");
+        void cause;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowBudget, project, projectId]);
+
+  const priorityTask = useMemo(
+    () => (tasks.data ? pickPriorityTask(tasks.data) : null),
+    [tasks.data],
+  );
+  const progressPercent = useMemo(
+    () => (tasks.data ? progressFromTasks(tasks.data) : null),
+    [tasks.data],
+  );
+  const riskComparison = useMemo(
+    () =>
+      buildRiskComparison(
+        progressPercent,
+        budgetStatus === "ready" && budget ? budget.executedPercent : null,
+      ),
+    [budget, budgetStatus, progressPercent],
+  );
 
   const onToggleTask = useCallback(
     async (task: TaskResponse, checked: boolean) => {
@@ -444,29 +515,96 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     (tab === "documentos" && documents.error?.kind === "rate_limited" && documents.error) ||
     null;
 
+  const canManagePriority = Boolean(
+    user && project && priorityTask && canEditTask(user, project, priorityTask),
+  );
+
+  const openEditTask = (focus: "assignee" | "dueDate") => {
+    if (!priorityTask) {
+      setToast({
+        open: true,
+        title: "No hay tarea prioritaria",
+        description: "Cuando exista una tarea pendiente podrás gestionarla aquí.",
+      });
+      return;
+    }
+    if (!canManagePriority) {
+      setToast({
+        open: true,
+        title: "No puedes editar esta tarea",
+        description: "Solo el responsable o quien coordina el proyecto pueden cambiarla.",
+      });
+      return;
+    }
+    setEditFocus(focus);
+    setEditTaskOpen(true);
+  };
+
+  const priorityColumns: DataTableColumn<TaskResponse>[] = [
+    {
+      id: "title",
+      header: "Tarea",
+      cell: (row) => row.title,
+    },
+    {
+      id: "assignee",
+      header: "Responsable",
+      cell: (row) => actorLabel(row.assigneeId, user),
+    },
+    {
+      id: "due",
+      header: "Fecha",
+      cell: (row) => formatDate(row.dueDate),
+    },
+    {
+      id: "status",
+      header: "Estado",
+      cell: (row) => {
+        const presentation = TASK_STATUS_PRESENTATION[row.status];
+        const Icon = presentation.icon;
+        return <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />;
+      },
+    },
+    {
+      id: "action",
+      header: "Acción",
+      cell: () => (
+        <Button intent="secondary" type="button" onClick={() => openEditTask("dueDate")}>
+          Editar tarea
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <S.Page>
       <S.Header>
         <S.HeaderText>
-          <S.TitleRow>
-            <S.Title>{project.title}</S.Title>
+          <S.Title>{project.title}</S.Title>
+          <S.Subtitle>
+            {project.status === "DELAYED"
+              ? "Detalle de proyecto en riesgo · alcance de gestión."
+              : (project.description ?? "Detalle del proyecto · alcance de gestión.")}
+          </S.Subtitle>
+          <S.MetaRow>
             <Badge
               label={statusPresentation.label}
               tone={statusPresentation.tone}
               icon={<StatusIcon />}
             />
-          </S.TitleRow>
-          {project.description ? <S.Subtitle>{project.description}</S.Subtitle> : null}
-          <S.Meta>
-            Responsable: {actorLabel(project.coordinatorId, user)}
-            {" · "}
-            Fecha límite: {formatDate(project.endDate)}
-          </S.Meta>
+            <S.Meta>Responsable: {actorLabel(project.coordinatorId, user)}</S.Meta>
+            <S.Meta>Fecha límite: {formatDate(project.endDate)}</S.Meta>
+          </S.MetaRow>
         </S.HeaderText>
         <S.HeaderActions>
+          <span ref={manageTaskTriggerRef}>
+            <Button intent="primary" type="button" onClick={() => openEditTask("assignee")}>
+              Gestionar tarea
+            </Button>
+          </span>
           <span ref={registerTriggerRef}>
             <Button
-              intent="primary"
+              intent="secondary"
               type="button"
               onClick={() => {
                 if (!allowProgress) {
@@ -485,6 +623,92 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           </span>
         </S.HeaderActions>
       </S.Header>
+
+      {riskComparison ? (
+        <S.Banner $tone="warning" role="status">
+          <S.BannerText>
+            Desviación de {Math.abs(riskComparison.deviationPoints)} puntos porcentuales entre
+            ejecución y avance.
+          </S.BannerText>
+        </S.Banner>
+      ) : null}
+
+      <S.RiskGrid>
+        <S.RiskCard>
+          <S.RiskCardTitle>
+            {project.title}
+            {riskComparison ? " · mismo periodo disponible" : " · comparación"}
+          </S.RiskCardTitle>
+          {riskComparison ? (
+            <>
+              <S.MetricRow>
+                <S.MetricLabelRow>
+                  <S.MetricLabel>Avance de investigación</S.MetricLabel>
+                  <S.MetricValue>{formatPercent(riskComparison.progressPercent)}</S.MetricValue>
+                </S.MetricLabelRow>
+                <S.Track>
+                  <S.Fill $tone="primary" $percent={riskComparison.progressPercent} />
+                </S.Track>
+              </S.MetricRow>
+              <S.MetricRow>
+                <S.MetricLabelRow>
+                  <S.MetricLabel>Presupuesto ejecutado</S.MetricLabel>
+                  <S.MetricValue>{formatPercent(riskComparison.executedPercent)}</S.MetricValue>
+                </S.MetricLabelRow>
+                <S.Track>
+                  <S.Fill $tone="warning" $percent={riskComparison.executedPercent} />
+                </S.Track>
+              </S.MetricRow>
+              <Link href={`/presupuesto?projectId=${projectId}`}>Ver presupuesto</Link>
+            </>
+          ) : (
+            <S.DecisionBody>
+              {budgetStatus === "loading" || tasks.status === "loading"
+                ? "Cargando medidas comparables…"
+                : "La comparación avance/presupuesto solo aparece cuando ambas medidas están disponibles. No se sustituye un dato ausente por cero."}
+            </S.DecisionBody>
+          )}
+        </S.RiskCard>
+
+        <S.RiskCard>
+          <S.DecisionTitle>Próxima decisión</S.DecisionTitle>
+          <S.DecisionBody>
+            {priorityTask
+              ? `${priorityTask.title} requiere seguimiento. Revisa responsable y fecha para acordar la recuperación.`
+              : "No hay una tarea prioritaria abierta en este momento."}
+          </S.DecisionBody>
+          <S.DecisionActions>
+            <Button
+              intent="secondary"
+              type="button"
+              disabled={!priorityTask}
+              onClick={() => openEditTask("assignee")}
+            >
+              Reasignar
+            </Button>
+            <Button
+              intent="secondary"
+              type="button"
+              disabled={!priorityTask}
+              onClick={() => openEditTask("dueDate")}
+            >
+              Cambiar fecha
+            </Button>
+          </S.DecisionActions>
+        </S.RiskCard>
+      </S.RiskGrid>
+
+      {priorityTask ? (
+        <S.PrioritySection aria-labelledby="priority-task-heading">
+          <S.PriorityTitle id="priority-task-heading">Tarea que requiere acción</S.PriorityTitle>
+          <DataTable
+            caption="Tarea prioritaria"
+            columns={priorityColumns}
+            rows={[priorityTask]}
+            getRowId={(row) => row.id}
+          />
+        </S.PrioritySection>
+      ) : null}
 
       {rateLimitError ? (
         <S.Banner $tone="warning" role="status">
@@ -541,12 +765,32 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         }}
       />
 
+      <EditTaskPanel
+        open={editTaskOpen}
+        onOpenChange={setEditTaskOpen}
+        project={project}
+        task={priorityTask}
+        me={user}
+        focusField={editFocus}
+        triggerRef={manageTaskTriggerRef}
+        onSuccess={(updated) => {
+          setTaskList((list) => list.map((item) => (item.id === updated.id ? updated : item)));
+          setHighlightedId(updated.id);
+          setToast({
+            open: true,
+            title: "Tarea actualizada",
+            description: updated.title,
+            tone: "success",
+          });
+        }}
+      />
+
       <Toast
         open={toast.open}
         onOpenChange={(open) => setToast((prev) => ({ ...prev, open }))}
         title={toast.title}
         description={toast.description}
-        tone="danger"
+        tone={toast.tone ?? "danger"}
       />
     </S.Page>
   );
