@@ -1,18 +1,19 @@
 # Quantia Web
 
 Cliente web de Quantia: Next.js (App Router) + React + TypeScript estricto, Styled Components con
-theme tipado (claro/oscuro), Radix UI, Framer Motion + GSAP, Recharts y Socket.io client.
+theme tipado (claro/oscuro), Radix UI, Framer Motion, Recharts y Socket.io client.
 
 Documentación canónica para agentes y humanos:
 
-| Archivo                                                                        | Uso                                            |
-| ------------------------------------------------------------------------------ | ---------------------------------------------- |
-| [`.cursorrules`](.cursorrules)                                                 | Stack bloqueado, invariantes, mapa de docs     |
-| [`AGENTS.md`](AGENTS.md)                                                       | Flujo de agentes, comandos, Definition of Done |
-| [`DESIGN.md`](DESIGN.md)                                                       | Tokens y componentes registrados               |
-| [`.cursor/docs/SCREENS.md`](.cursor/docs/SCREENS.md)                           | Inventario de pantallas y roles                |
-| [`.cursor/docs/frontend-conventions.md`](.cursor/docs/frontend-conventions.md) | Carpetas, PR, env                              |
-| [`.cursor/rules/`](.cursor/rules/)                                             | Reglas modulares (`.mdc`): UI, a11y, API       |
+| Archivo                                                                        | Uso                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| [`.cursorrules`](.cursorrules)                                                 | Stack bloqueado, invariantes, mapa de docs              |
+| [`AGENTS.md`](AGENTS.md)                                                       | Flujo de agentes, comandos, Definition of Done          |
+| [`DESIGN.md`](DESIGN.md)                                                       | Tokens y componentes registrados                        |
+| [`.cursor/docs/SCREENS.md`](.cursor/docs/SCREENS.md)                           | Inventario de pantallas y roles                         |
+| [`.cursor/docs/frontend-conventions.md`](.cursor/docs/frontend-conventions.md) | Carpetas, PR, env                                       |
+| [`.cursor/docs/api-connection.md`](.cursor/docs/api-connection.md)             | Conexión frontend↔API (HTTP, sesión, sockets, sync, F3) |
+| [`.cursor/rules/`](.cursor/rules/)                                             | Reglas modulares (`.mdc`): UI, a11y, API                |
 
 ## Requisitos
 
@@ -43,20 +44,26 @@ npm run dev
 
 ```text
 src/
-├── app/              # rutas (App Router); _components/ = vistas privadas de la ruta
-├── components/ui/    # componentes del sistema de diseño (solo los registrados en DESIGN.md)
-├── features/         # un módulo por dominio: projects, tasks, progress, budget, reports, audit, sync
-├── hooks/            # hooks compartidos
+├── app/                 # rutas (App Router); api/session/* = cookie httpOnly
+├── components/
+│   ├── base/            # Button, TextField, Select…
+│   ├── composite/       # FilterBar, TaskRow…
+│   ├── page/            # AppShell, AppHeader, DataTable…
+│   └── system/          # EmptyState, ErrorState, SyncStatus, ConnectionStatus…
+├── features/            # un módulo por dominio (projects, tasks, progress, reports, sync…)
 ├── lib/
-│   ├── api/          # cliente único de la API (/api/v1), sesión en memoria y errores normalizados
-│   ├── socket.ts     # Socket.io (/projects, /notifications)
-│   ├── gsap.ts       # registro único de plugins de GSAP
-│   └── styled-registry.tsx  # registry SSR de Styled Components
-├── config/env.ts     # variables públicas validadas con zod
-├── providers/        # ThemeProvider, GlobalStyle, MotionConfig
-├── theme/            # paleta clara/oscura, tokens y GlobalStyle
-└── types/
+│   ├── api/             # cliente único /api/v1, sesión, errores, sync retry
+│   ├── auth/            # permisos y return path post-login
+│   ├── socket/          # Socket.io (/projects, /notifications, /general)
+│   ├── query/           # React Query provider
+│   └── format/          # COP, DD/MM/AAAA, porcentajes
+├── config/env.ts        # variables públicas validadas con Zod
+├── providers/           # Theme, Query, Socket, Motion
+└── theme/               # paleta clara/oscura, tokens y registry SSR
 ```
+
+Detalle de carpetas y PR: [`.cursor/docs/frontend-conventions.md`](.cursor/docs/frontend-conventions.md).
+Conexión a la API (F3): [`.cursor/docs/api-connection.md`](.cursor/docs/api-connection.md).
 
 ## Theme y modo oscuro
 
@@ -69,18 +76,15 @@ src/
 ## Cliente de la API
 
 ```ts
-import { api } from "@/lib/api";
-import { projectListSchema } from "@quantia/contracts";
+import { listProjects } from "@/lib/api";
 
-const projects = await api.get("/projects", {
-  schema: projectListSchema,
-  query: { page: 1, pageSize: 20 },
-});
+const projects = await listProjects({ page: 1, pageSize: 20 });
 ```
 
-- El access token vive solo en memoria (`setAccessToken`); el refresh token es una cookie httpOnly.
-- Ante un 401 hace un refresh silencioso (configúralo con `configureRefresh` usando el contrato de
-  auth) y reintenta una vez; si falla, emite `onSessionExpired` para mostrar el modal de sesión.
-- Ante un 429 espera `Retry-After` y reintenta una vez.
-- Todos los errores salen como `ApiError` con `kind` normalizado; los 401/403/404 usan mensajes
-  genéricos para no revelar recursos fuera del alcance del usuario.
+- El access token vive solo en memoria; el refresh token es una cookie httpOnly (`/api/session/*`).
+- Ante un 401 hace un refresh silencioso (single-flight) y reintenta una vez; si falla, emite
+  `onSessionExpired` (modal OVR-04) y puede restaurar la ruta con `?from=`.
+- Ante un 429 espera `Retry-After` (UI con countdown); el cliente puede reintentar una vez tras la espera.
+- Errores normalizados como `ApiError`; mapeo a `ErrorState` vía `errorStatePropsFromApiError`.
+- Tiempo real: Socket.io autenticado con JWT; sync Notion con `SyncStatus` + reintento admin provisional;
+  reportes asíncronos por polling (sin eventos `reporte.completado` / `sync.failed` en el contrato).

@@ -31,10 +31,12 @@ The UI may be STRICTER than the API (hide what the DS hides), never looser.
 
 ## 1. Environments and configuration
 
+Operational guide (env, session, sockets, sync, reports, errors): `.cursor/docs/api-connection.md` (DS-117 / F3).
+
 - `NEXT_PUBLIC_API_URL`: API origin WITHOUT suffix (e.g. `https://quantiaapi-production.up.railway.app`).
-- `src/lib/config.ts` is the only file that reads `process.env` and derives:
-  - `apiBaseUrl = ${NEXT_PUBLIC_API_URL}/api/v1` (REST)
-  - `socketUrl = ${NEXT_PUBLIC_API_URL}` + namespace (`RealtimeNamespace` from contracts)
+- `NEXT_PUBLIC_SOCKET_URL`: Socket.io gateway origin (usually the same host as the API).
+- `src/config/env.ts` is the only module that reads `process.env` (Zod). REST calls use
+  `${NEXT_PUBLIC_API_URL}/api/v1`; sockets use `NEXT_PUBLIC_SOCKET_URL` + `RealtimeNamespace`.
 - CORS (allowlist, `credentials: true`):
   - Production: only the production domain. Staging: also `https://*.vercel.app` (Vercel previews).
   - A non-allowed origin fails in the browser with no readable response: it is not a client bug.
@@ -48,7 +50,8 @@ The UI may be STRICTER than the API (hide what the DS hides), never looser.
 - Layers (imports flow app → features → components; components never import `lib/api`):
   - `src/lib/api/client.ts`: base request (Bearer, JSON, single-flight refresh, error normalization, `Retry-After`).
   - `src/lib/api/errors.ts`: `class ApiError { statusCode; message; path; timestamp; retryAfterSeconds?: number }`.
-  - `src/lib/api/{auth,users,projects,tasks,progress,documents,budget,reports,chat-general}.ts`: one function per endpoint.
+  - `src/lib/api/{auth,users,projects,tasks,progress,documents,budget,reports,sync}.ts`: one function per endpoint
+    (plus `errorUi.ts` for ErrorState mapping).
   - `src/lib/api/query-keys.ts`: cache keys per domain (`['projects', params]`, `['tasks', projectId, params]`…).
   - `src/features/<domain>/hooks`: the only place that wraps endpoint functions with the query cache.
   - `src/features/<domain>/services`: optional composition of several endpoint functions; never calls `client.ts`.
@@ -327,7 +330,9 @@ No generic spinner, no blank screen.
 Applies to projects, tasks and progress (`syncStatus: PENDING · SYNCED · FAILED`):
 - `PENDING` → badge «Sincronizando con Notion»; the user keeps working.
 - `FAILED` → banner «No se pudo sincronizar con Notion». The Quantia data IS valid: never block reading or editing.
-  Only ADMINISTRADOR sees «Reintentar» (F-05), and only when the retry endpoint exists (§12).
+  Only ADMINISTRADOR sees «Reintentar» (F-05 / DS-120) via provisional `POST /sync/:entityType/:id/retry`
+  (`src/lib/api/sync.ts`). Response schemas are still pending in `@quantia/contracts` (§12); do not invent
+  a `sync.failed` socket event.
 - `SYNCED` → no indicator (or a discreet check).
 - Scope (DS): Investigador sees the state of his own data, Coordinador of his portfolio, Admin everything.
 - `syncStatus` is NOT in socket payloads: after an event, refetch the resource.
@@ -349,8 +354,8 @@ Applies to projects, tasks and progress (`syncStatus: PENDING · SYNCED · FAILE
 
 ## 6. Real time (Socket.io)
 
-- A single provider in `src/lib/socket/` (`client.ts`, `events.ts`, `provider.tsx`) owns every socket.
-  NO sockets in components; components subscribe through hooks.
+- A single provider in `src/lib/socket/` (`connection.ts`, `events.ts`, `SocketProvider.tsx`,
+  `useProjectSocket.ts`) owns every socket. NO sockets in components; components subscribe through hooks.
 - Server limits: 5 simultaneous connections per user (ALL tabs and namespaces), 30 events/s per socket, 60 s idle
   (covered by Socket.io ping/pong). Exceeding → `error { message: 'Too many connections' }` + disconnect.
 - Connection budget (one tab with all three namespaces already uses 3 of 5):
@@ -463,7 +468,7 @@ Roles (`RoleName`): `INVESTIGADOR`, `COORDINADOR`, `ADMINISTRADOR`; several role
 | Reports | `PROGRESS_PDF` of his projects | PDF/Excel of portfolio | PDF/Excel (institutional: §12) |
 | Users | own profile only | — | CRUD users and roles |
 | Audit | — | only if approved | full (§12) |
-| Sync | state of own data | state of portfolio | state + retry (§12) |
+| Sync | state of own data | state of portfolio | state + provisional retry (DS-120; schemas §12) |
 | Chat General | yes (if enabled) | yes | yes |
 
 - Sections without permission are NOT rendered (not disabled, not greyed) and are absent from `RoleSidebar`.
@@ -522,8 +527,8 @@ The DS requires these, but they are not in `@quantia/contracts` v0.7.0. Do not r
 | --- | --- | --- |
 | Coordinator/admin KPIs (`GET /dashboard`) | dashboard endpoint | `/panel` and `/institucional` compose KPIs from `GET /projects` (status counts via `meta.total` per status filter) |
 | «Mis tareas» across projects | cross-project "my tasks" endpoint | `GET /projects` + `GET /projects/:id/tasks?assigneeId=me.id` per project, max 4 concurrent, `pageSize` 50 |
-| Sync retry (F-05) and `sync.failed` | `POST /sync/:entityType/:id/retry`, event | show `FAILED` without «Reintentar» |
-| `reporte.completado` | event | polling (§5); when added, it stops polling and fires the `Toast` |
+| Sync retry schemas + `sync.failed` | Formal POST response / event | Provisional admin `POST /sync/:entityType/:id/retry` (DS-120); UI from REST `syncStatus`; no socket |
+| `reporte.completado` | event | polling (§5 / DS-121); when added, it can stop polling and fire the `Toast` |
 | Audit, convocatorias, institutional reports | endpoints | do not render the modules |
 | Comments on progress (Coordinador) | endpoint | read-only progress |
 | Event fields `dueDate`, `summary`, `reason`, `severity`, `progressPercent` | payload fields | refetch the resource |
@@ -537,3 +542,4 @@ The DS requires these, but they are not in `@quantia/contracts` v0.7.0. Do not r
 - `.cursor/rules/accessibility-ux.mdc` — live regions, focus, copy, formats.
 - `.cursor/docs/SCREENS.md` — screen inventory, routes, roles.
 - `.cursor/docs/frontend-conventions.md` — folder structure, env vars, PR and DoD.
+- `.cursor/docs/api-connection.md` — F3 connection guide (HTTP, session, sockets, sync, reports, errors).
