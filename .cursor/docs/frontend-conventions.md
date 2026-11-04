@@ -3,8 +3,9 @@
 Canonical path: `.cursor/docs/frontend-conventions.md` (not `docs/frontend-conventions.md`).
 Operational detail behind `.cursorrules` and `AGENTS.md`. Mónica uses this file as the PR review checklist.
 
-Related: `DESIGN.md` · `.cursor/docs/SCREENS.md` · `.cursor/rules/ui-design-system.mdc` ·
-`.cursor/rules/accessibility-ux.mdc` · `.cursor/rules/api-integration.mdc`
+Related: `DESIGN.md` · `.cursor/docs/SCREENS.md` · `.cursor/docs/api-connection.md` ·
+`.cursor/rules/ui-design-system.mdc` · `.cursor/rules/accessibility-ux.mdc` ·
+`.cursor/rules/api-integration.mdc`
 
 ## 1. Folder structure
 
@@ -41,11 +42,13 @@ src/
 │  ├─ tokens.ts · light.ts · dark.ts · mixins.ts
 │  ├─ registry.tsx               # styled-components SSR registry
 │  └─ styled.d.ts                # DefaultTheme typing
+├─ config/
+│  └─ env.ts                     # the only reader of process.env (Zod)
 └─ lib/
-   ├─ config.ts                  # the only reader of process.env
-   ├─ api/                       # client.ts, errors.ts, query-keys.ts, one file per domain
-   ├─ auth/                      # permissions.ts
-   ├─ socket/                    # client.ts, events.ts, provider.tsx (typed from contracts)
+   ├─ api/                       # client.ts, errors.ts, errorUi.ts, query-keys.ts, sync.ts, one file per domain
+   ├─ auth/                      # permissions.ts, returnPath.ts
+   ├─ socket/                    # connection.ts, events.ts, SocketProvider.tsx, useProjectSocket.ts
+   ├─ query/                     # QueryProvider + shared QueryClient
    └─ format/                    # currency.ts (COP), date.ts (DD/MM/AAAA, toApiDate), percent.ts
 ```
 
@@ -150,15 +153,16 @@ A UI task is done only when ALL of these are true:
 
 Environment variables (`.env.example` is committed; `.env.local` is gitignored):
 
-| Variable              | Example                 | Notes                                                                               |
-| --------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | API origin WITHOUT suffix; `config.ts` derives REST `/api/v1` and the Socket.io URL |
-| `NEXT_PUBLIC_APP_ENV` | `development`           | `development` · `preview` · `production`                                            |
+| Variable                 | Example                 | Notes                                                                |
+| ------------------------ | ----------------------- | -------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`    | `http://localhost:4000` | API origin WITHOUT suffix; client appends `/api/v1`                  |
+| `NEXT_PUBLIC_SOCKET_URL` | `http://localhost:4000` | Socket.io gateway origin (namespaces `/projects`, `/notifications`…) |
+| `NEXT_PUBLIC_APP_ENV`    | `development`           | `development` · `preview` · `production` (if used)                   |
 
 - Every `NEXT_PUBLIC_*` value is public: never put tokens, keys or secrets there. The frontend
   needs no secrets; Supabase, Notion and Redis credentials live only in the API.
-- Variables are read once in `src/lib/config.ts` and validated with Zod at startup; never read
-  `process.env` elsewhere.
-- Vercel: set both variables per environment (Production, Preview, Development). Preview URLs
+- Variables are read once in `src/config/env.ts` and validated with Zod at startup; never read
+  `process.env` elsewhere. Connection details: `.cursor/docs/api-connection.md`.
+- Vercel: set API and socket URLs per environment (Production, Preview, Development). Preview URLs
   must match the API CORS allowlist pattern.
-- Adding a variable = update `.env.example`, `src/lib/config.ts`, this table and Vercel in the same PR.
+- Adding a variable = update `.env.example`, `src/config/env.ts`, this table and Vercel in the same PR.

@@ -101,6 +101,7 @@ Code, components and tokens in English; all user-facing UI copy in Spanish.
 | `DESIGN.md` | Tokens, registered components, patterns | Before ANY UI work |
 | `.cursor/docs/SCREENS.md` | Screen inventory, routes, roles, blueprints | Any screen / route task |
 | `.cursor/docs/frontend-conventions.md` | Folders, Figma→code, Git/PR, DoD, env | Structure, PR, setup |
+| `.cursor/docs/api-connection.md` | Frontend↔API connection (F3: HTTP, session, sockets, sync, reports, errors) | Integration, onboarding, realtime/sync/reports work |
 | `.cursor/rules/ui-design-system.mdc` | Thin UI rule → points to `DESIGN.md` | `src/components/**`, `src/theme/**`, `*.styles.ts` |
 | `.cursor/rules/accessibility-ux.mdc` | A11y, copy, formats, focus, charts | `src/app/**`, `src/components/**` |
 | `.cursor/rules/api-integration.mdc` | Contracts, client, session, sockets, roles | `src/lib/**`, `src/features/**`, `src/app/**` |
