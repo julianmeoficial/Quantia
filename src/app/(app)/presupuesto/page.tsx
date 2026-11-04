@@ -1,5 +1,5 @@
-import { SectionStub } from "../section-stub";
+import { BudgetScreen } from "@/features/budget/BudgetScreen";
 
 export default function PresupuestoPage() {
-  return <SectionStub title="Presupuesto" />;
+  return <BudgetScreen />;
 }

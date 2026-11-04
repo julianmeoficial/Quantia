@@ -1,7 +1,9 @@
 import {
+  createTaskRequestSchema,
   listTasksQuerySchema,
   paginatedTasksResponseSchema,
   taskResponseSchema,
+  type CreateTaskRequest,
   type ListTasksQuery,
   type PaginatedTasksResponse,
   type TaskResponse,
@@ -33,6 +35,16 @@ export function listProjectTasks(
 
 export function getProjectTask(projectId: string, taskId: string): Promise<TaskResponse> {
   return api.get(`/projects/${projectId}/tasks/${taskId}`, {
+    schema: taskResponseSchema,
+  });
+}
+
+export function createProjectTask(
+  projectId: string,
+  body: CreateTaskRequest,
+): Promise<TaskResponse> {
+  const parsed = createTaskRequestSchema.parse(body);
+  return api.post(`/projects/${projectId}/tasks`, parsed, {
     schema: taskResponseSchema,
   });
 }

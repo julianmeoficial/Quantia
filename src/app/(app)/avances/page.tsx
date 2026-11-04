@@ -1,5 +1,5 @@
-import { SectionStub } from "../section-stub";
+import { ProgressListScreen } from "@/features/progress/ProgressListScreen";
 
 export default function AvancesPage() {
-  return <SectionStub title="Avances" />;
+  return <ProgressListScreen />;
 }
