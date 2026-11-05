@@ -8,8 +8,10 @@ export const borderWidths = {
   thick: "0.125rem",
 } as const;
 
+/** DESIGN.md §5: Source Sans 3 (interface) + Urbanist (headings), loaded via next/font. */
 export const fonts = {
   sans: "var(--font-sans), system-ui, sans-serif",
+  heading: "var(--font-heading), var(--font-sans), system-ui, sans-serif",
   mono: "var(--font-mono), ui-monospace, monospace",
 } as const;
 

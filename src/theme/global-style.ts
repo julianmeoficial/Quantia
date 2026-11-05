@@ -52,6 +52,22 @@ export const GlobalStyle = createGlobalStyle`
     -webkit-font-smoothing: antialiased;
   }
 
+  h1,
+  h2,
+  h3 {
+    font-family: ${({ theme }) => theme.fonts.heading};
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: ${({ theme }) => theme.colors.selection.bg};
+    color: ${({ theme }) => theme.colors.selection.text};
+  }
+
   img,
   picture,
   svg,

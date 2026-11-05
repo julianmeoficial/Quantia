@@ -8,6 +8,7 @@ import { AlertIcon, CheckCircleIcon, ClockIcon } from "@/components/base/icons";
 import { EmptyState } from "@/components/system";
 
 import * as S from "./AlertList.styles";
+import { useGsapReveal } from "@/lib/motion";
 
 export type AlertSeverity = "critical" | "attention" | "on-track";
 
@@ -50,6 +51,13 @@ export function AlertList({
   emptyDescription = "No hay avisos en este momento.",
   highlightedIds = [],
 }: AlertListProps) {
+  const scope = useGsapReveal<HTMLUListElement>({
+    y: 8,
+    stagger: 0.05,
+    disabled: items.length === 0,
+    dependencies: [items.length > 0],
+  });
+
   if (items.length === 0) {
     return <EmptyState kind="no-records" title={emptyTitle} description={emptyDescription} />;
   }
@@ -58,12 +66,16 @@ export function AlertList({
   const highlighted = new Set(highlightedIds);
 
   return (
-    <S.List aria-label="Alertas">
+    <S.List ref={scope} aria-label="Alertas">
       {ordered.map((item) => {
         const presentation = PRESENTATION[item.severity];
         const Icon = presentation.icon;
         return (
-          <S.Item key={item.id} data-highlighted={highlighted.has(item.id) ? "true" : undefined}>
+          <S.Item
+            key={item.id}
+            data-reveal
+            data-highlighted={highlighted.has(item.id) ? "true" : undefined}
+          >
             <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />
             <S.Title>{item.title}</S.Title>
             <S.Text>{item.interpretation}</S.Text>

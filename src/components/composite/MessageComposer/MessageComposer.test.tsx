@@ -29,8 +29,8 @@ describe("MessageComposer", () => {
     expect(onSend).toHaveBeenCalledOnce();
   });
 
-  it("shows the visible character counter", () => {
-    renderWithTheme(
+  it("shows the counter only near the limit", () => {
+    const { rerender } = renderWithTheme(
       <MessageComposer
         value="abc"
         onChange={() => undefined}
@@ -38,6 +38,50 @@ describe("MessageComposer", () => {
         maxLength={10}
       />,
     );
-    expect(screen.getByText("3/10")).toBeInTheDocument();
+    expect(screen.queryByText("3/10")).toBeNull();
+    rerender(
+      <ThemeProvider theme={theme}>
+        <MessageComposer
+          value="abcdefghi"
+          onChange={() => undefined}
+          onSend={() => undefined}
+          maxLength={10}
+        />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText("9/10")).toBeInTheDocument();
+  });
+
+  it("shows the reply context and cancels it with Escape", () => {
+    const onCancel = vi.fn();
+    renderWithTheme(
+      <MessageComposer
+        value=""
+        onChange={() => undefined}
+        onSend={() => undefined}
+        maxLength={2000}
+        context={{ title: "Respondiendo a Luis", excerpt: "Plan de trabajo" }}
+        onCancelContext={onCancel}
+      />,
+    );
+    expect(screen.getByText("Respondiendo a Luis")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("Mensaje"), { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("switches to edit mode with its own primary action", () => {
+    renderWithTheme(
+      <MessageComposer
+        value="hola"
+        onChange={() => undefined}
+        onSend={() => undefined}
+        maxLength={2000}
+        mode="edit"
+        context={{ title: "Editando mensaje", excerpt: "hola" }}
+        onCancelContext={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText("Editar mensaje")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeInTheDocument();
   });
 });

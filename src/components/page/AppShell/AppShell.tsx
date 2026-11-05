@@ -141,6 +141,10 @@ export interface AppShellProps {
   unreadCount?: number;
   onNoticesOpenChange?: (open: boolean) => void;
   connectionPaused?: boolean;
+  /** Hide «Chat» only when the API confirms it is disabled. */
+  chatEnabled?: boolean;
+  /** Unread counters per nav href (e.g. `{ "/chat": 3 }`). */
+  navBadges?: Readonly<Record<string, number>>;
 }
 
 export function AppShell({
@@ -156,6 +160,8 @@ export function AppShell({
   unreadCount = 0,
   onNoticesOpenChange,
   connectionPaused = false,
+  chatEnabled = true,
+  navBadges,
 }: AppShellProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -170,9 +176,10 @@ export function AppShell({
     );
   }
 
-  const items = navigationFor(identity.roles, { chatEnabled: true }).map((entry) => ({
+  const items = navigationFor(identity.roles, { chatEnabled }).map((entry) => ({
     ...entry,
     icon: iconForHref(entry.href),
+    badge: navBadges?.[entry.href] ?? 0,
   }));
   const home = landing(identity.roles);
   const role = primaryRole(identity.roles);

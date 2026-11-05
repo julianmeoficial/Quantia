@@ -44,6 +44,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   /** Optional `from` restores the protected route after re-login. */
   endExpiredSession: (from?: string) => Promise<void>;
+  /** Applies a fresh `UserResponse` of the same user (e.g. after `PATCH /users/me/avatar`). */
+  replaceUser: (next: UserResponse) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -216,9 +218,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [dropSession],
   );
 
+  const replaceUser = useCallback((next: UserResponse) => {
+    setUser((current) => (current && current.id === next.id ? next : current));
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ status, user, identity: identityOf(user), login, logout, endExpiredSession }}
+      value={{
+        status,
+        user,
+        identity: identityOf(user),
+        login,
+        logout,
+        endExpiredSession,
+        replaceUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

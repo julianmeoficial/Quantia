@@ -17,6 +17,16 @@ const connectionBudgetPaused = new Set<SocketNamespace>();
 const pauseListeners = new Set<() => void>();
 
 const TOO_MANY = "Too many connections";
+const TOO_MANY_CODE = "TOO_MANY_CONNECTIONS";
+
+/** `/general` sends `{ code, message }`; older namespaces send a plain message. */
+export function isTooManyConnections(payload: unknown): boolean {
+  if (typeof payload === "string") return payload.includes(TOO_MANY);
+  if (typeof payload !== "object" || payload === null) return false;
+  const { code, message } = payload as { code?: unknown; message?: unknown };
+  if (code === TOO_MANY_CODE) return true;
+  return typeof message === "string" && message.includes(TOO_MANY);
+}
 
 function emitPauseChange() {
   for (const listener of pauseListeners) listener();
@@ -73,16 +83,7 @@ export function getSocket(namespace: SocketNamespace): Socket {
   });
 
   socket.on("error", (payload: unknown) => {
-    const message =
-      typeof payload === "object" &&
-      payload !== null &&
-      "message" in payload &&
-      typeof (payload as { message: unknown }).message === "string"
-        ? (payload as { message: string }).message
-        : typeof payload === "string"
-          ? payload
-          : "";
-    if (message.includes(TOO_MANY)) {
+    if (isTooManyConnections(payload)) {
       pauseNamespace(namespace);
     }
   });

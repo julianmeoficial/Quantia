@@ -1,6 +1,7 @@
 # `@quantia/contracts`
 
-Tarball vendored de `@quantia/contracts@0.7.0` (`file:vendor/quantia-contracts-0.7.0.tgz`).
+Tarball vendored de `@quantia/contracts@0.8.0` (`file:vendor/quantia-contracts-0.8.0.tgz`).
+Incluye Chat General v2 (avatares, `seq`/`version`, editar/borrar, reacciones, typing, leídos, feed de cambios).
 El paquete es privado en el monorepo `Quantia_API/packages/contracts`; no hay registry.
 
 Para regenerarlo cuando suba la API:

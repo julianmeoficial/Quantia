@@ -11,6 +11,8 @@ module.exports = async function setupA11yMocks(browser) {
     fullName: "Usuario Accesibilidad",
     isActive: true,
     roles: ["ADMINISTRADOR", "COORDINADOR", "INVESTIGADOR"],
+    avatar: "AVATAR_01",
+    avatarRequired: false,
     createdAt: "2026-11-04T17:00:00.000Z",
     updatedAt: "2026-11-04T17:00:00.000Z",
   };
@@ -134,6 +136,27 @@ module.exports = async function setupA11yMocks(browser) {
       });
     }
 
+    if (path === "/api/v1/chat/general/state") {
+      return request.respond({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          serverTime: "2026-11-04T16:05:00.000Z",
+          latestSeq: 1,
+          lastReadSeq: 1,
+          unreadCount: 0,
+          readStates: [{ userId: user.id, lastReadSeq: 1 }],
+          limits: {
+            messageMaxLength: 2000,
+            editWindowSeconds: 172800,
+            typingTtlMs: 6000,
+            historyMaxLimit: 100,
+          },
+          reactions: ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "🎉"],
+        }),
+      });
+    }
+
     if (path === "/api/v1/chat/general/messages") {
       return request.respond({
         status: 200,
@@ -142,10 +165,17 @@ module.exports = async function setupA11yMocks(browser) {
           items: [
             {
               id: "66666666-6666-4666-8666-666666666666",
+              seq: 1,
+              version: 1,
               content: "Hola, mensaje de prueba de accesibilidad.",
               clientMessageId: null,
               createdAt: "2026-11-04T16:00:00.000Z",
-              author: { id: user.id, name: user.fullName, avatarUrl: null },
+              updatedAt: "2026-11-04T16:00:00.000Z",
+              editedAt: null,
+              deletedAt: null,
+              author: { id: user.id, name: user.fullName, avatar: "AVATAR_01", avatarUrl: null },
+              replyTo: null,
+              reactions: [],
             },
           ],
           nextCursor: null,

@@ -1,60 +1,63 @@
 import {
   ChatGeneralEvent,
+  chatGeneralAckSchema,
+  chatGeneralEscribiendoPayloadSchema,
+  chatGeneralLecturaPayloadSchema,
   chatGeneralMensajeCreadoPayloadSchema,
+  chatGeneralMensajeEditadoPayloadSchema,
+  chatGeneralMensajeEliminadoPayloadSchema,
   chatGeneralPresenciaPayloadSchema,
+  chatGeneralReaccionesActualizadasPayloadSchema,
+  chatGeneralSocketErrorSchema,
+  chatGeneralUsuarioActualizadoPayloadSchema,
   chatGeneralUsuarioConectadoPayloadSchema,
   chatGeneralUsuarioDesconectadoPayloadSchema,
-  type ChatGeneralMensajeCreadoPayload,
-  type ChatGeneralPresenciaPayload,
-  type ChatGeneralUsuarioConectadoPayload,
-  type ChatGeneralUsuarioDesconectadoPayload,
+  type ChatGeneralAck,
+  type ChatGeneralSocketError,
 } from "@quantia/contracts";
+import type { z } from "zod";
+
+/** Every server → client event on `/general`, validated with its contract schema. */
+const chatGeneralSchemas = {
+  [ChatGeneralEvent.PRESENCIA]: chatGeneralPresenciaPayloadSchema,
+  [ChatGeneralEvent.USUARIO_CONECTADO]: chatGeneralUsuarioConectadoPayloadSchema,
+  [ChatGeneralEvent.USUARIO_DESCONECTADO]: chatGeneralUsuarioDesconectadoPayloadSchema,
+  [ChatGeneralEvent.USUARIO_ACTUALIZADO]: chatGeneralUsuarioActualizadoPayloadSchema,
+  [ChatGeneralEvent.MENSAJE_CREADO]: chatGeneralMensajeCreadoPayloadSchema,
+  [ChatGeneralEvent.MENSAJE_EDITADO]: chatGeneralMensajeEditadoPayloadSchema,
+  [ChatGeneralEvent.MENSAJE_ELIMINADO]: chatGeneralMensajeEliminadoPayloadSchema,
+  [ChatGeneralEvent.REACCIONES_ACTUALIZADAS]: chatGeneralReaccionesActualizadasPayloadSchema,
+  [ChatGeneralEvent.ESCRIBIENDO]: chatGeneralEscribiendoPayloadSchema,
+  [ChatGeneralEvent.LECTURA]: chatGeneralLecturaPayloadSchema,
+} as const;
+
+type ChatGeneralSchemas = typeof chatGeneralSchemas;
+
+export type ChatGeneralServerEvent = keyof ChatGeneralSchemas;
 
 export type ChatGeneralPayloadByEvent = {
-  [ChatGeneralEvent.PRESENCIA]: ChatGeneralPresenciaPayload;
-  [ChatGeneralEvent.USUARIO_CONECTADO]: ChatGeneralUsuarioConectadoPayload;
-  [ChatGeneralEvent.USUARIO_DESCONECTADO]: ChatGeneralUsuarioDesconectadoPayload;
-  [ChatGeneralEvent.MENSAJE_CREADO]: ChatGeneralMensajeCreadoPayload;
+  [E in ChatGeneralServerEvent]: z.infer<ChatGeneralSchemas[E]>;
 };
 
-export function parseChatGeneralPayload(
-  event: typeof ChatGeneralEvent.PRESENCIA,
+export const CHAT_GENERAL_SERVER_EVENTS = Object.keys(
+  chatGeneralSchemas,
+) as ChatGeneralServerEvent[];
+
+/** Returns `null` for payloads that do not match the contract (they are ignored). */
+export function parseChatGeneralPayload<E extends ChatGeneralServerEvent>(
+  event: E,
   raw: unknown,
-): ChatGeneralPresenciaPayload | null;
-export function parseChatGeneralPayload(
-  event: typeof ChatGeneralEvent.USUARIO_CONECTADO,
-  raw: unknown,
-): ChatGeneralUsuarioConectadoPayload | null;
-export function parseChatGeneralPayload(
-  event: typeof ChatGeneralEvent.USUARIO_DESCONECTADO,
-  raw: unknown,
-): ChatGeneralUsuarioDesconectadoPayload | null;
-export function parseChatGeneralPayload(
-  event: typeof ChatGeneralEvent.MENSAJE_CREADO,
-  raw: unknown,
-): ChatGeneralMensajeCreadoPayload | null;
-export function parseChatGeneralPayload(
-  event: keyof ChatGeneralPayloadByEvent,
-  raw: unknown,
-): ChatGeneralPayloadByEvent[keyof ChatGeneralPayloadByEvent] | null {
-  switch (event) {
-    case ChatGeneralEvent.PRESENCIA: {
-      const parsed = chatGeneralPresenciaPayloadSchema.safeParse(raw);
-      return parsed.success ? parsed.data : null;
-    }
-    case ChatGeneralEvent.USUARIO_CONECTADO: {
-      const parsed = chatGeneralUsuarioConectadoPayloadSchema.safeParse(raw);
-      return parsed.success ? parsed.data : null;
-    }
-    case ChatGeneralEvent.USUARIO_DESCONECTADO: {
-      const parsed = chatGeneralUsuarioDesconectadoPayloadSchema.safeParse(raw);
-      return parsed.success ? parsed.data : null;
-    }
-    case ChatGeneralEvent.MENSAJE_CREADO: {
-      const parsed = chatGeneralMensajeCreadoPayloadSchema.safeParse(raw);
-      return parsed.success ? parsed.data : null;
-    }
-    default:
-      return null;
-  }
+): ChatGeneralPayloadByEvent[E] | null {
+  const parsed = chatGeneralSchemas[event].safeParse(raw);
+  return parsed.success ? (parsed.data as ChatGeneralPayloadByEvent[E]) : null;
+}
+
+export function parseChatGeneralSocketError(raw: unknown): ChatGeneralSocketError | null {
+  const parsed = chatGeneralSocketErrorSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+export function parseChatGeneralAck(raw: unknown): ChatGeneralAck | null {
+  const parsed = chatGeneralAckSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }

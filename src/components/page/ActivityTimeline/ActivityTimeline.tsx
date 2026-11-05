@@ -5,6 +5,7 @@ import styled from "styled-components";
 import { Avatar, Button, Link } from "@/components/base";
 import { SyncStatus, type SyncStatusValue } from "@/components/system";
 import { formatDate } from "@/lib/format";
+import { useGsapReveal } from "@/lib/motion";
 
 const List = styled.ol`
   display: flex;
@@ -75,8 +76,15 @@ export function ActivityTimeline({
   onLoadOlder,
   isLoadingOlder = false,
 }: ActivityTimelineProps) {
+  const scope = useGsapReveal<HTMLDivElement>({
+    selector: "li",
+    y: 8,
+    disabled: items.length === 0,
+    dependencies: [items.length > 0],
+  });
+
   return (
-    <div>
+    <div ref={scope}>
       {onLoadOlder ? (
         <Button type="button" intent="ghost" onClick={onLoadOlder} isLoading={isLoadingOlder}>
           Cargar anteriores

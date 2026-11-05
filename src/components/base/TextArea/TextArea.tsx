@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type TextareaHTMLAttributes } from "react";
+import { useId, type Ref, type TextareaHTMLAttributes } from "react";
 
 import * as S from "./TextArea.styles";
 
@@ -8,6 +8,9 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   label: string;
   description?: string;
   error?: string;
+  /** Visible `n/max` counter (polite live region). Chat composers render their own. */
+  showCounter?: boolean;
+  ref?: Ref<HTMLTextAreaElement>;
 }
 
 export function TextArea({
@@ -19,6 +22,7 @@ export function TextArea({
   maxLength,
   value,
   rows = 4,
+  showCounter = true,
   ...rest
 }: TextAreaProps) {
   const generatedId = useId();
@@ -46,7 +50,7 @@ export function TextArea({
       />
       {description ? <S.Hint id={descriptionId}>{description}</S.Hint> : null}
       {error ? <S.ErrorText id={errorId}>{error}</S.ErrorText> : null}
-      {maxLength !== undefined && length !== undefined ? (
+      {showCounter && maxLength !== undefined && length !== undefined ? (
         <S.Counter aria-live="polite">
           {length}/{maxLength}
         </S.Counter>

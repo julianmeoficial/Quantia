@@ -5,17 +5,29 @@ export {
   getPausedNamespaces,
   getSocket,
   isNamespacePaused,
+  isTooManyConnections,
   reconnectSocket,
   subscribeConnectionPause,
   updateSocketAuth,
 } from "./connection";
 export type { SocketNamespace } from "./connection";
 export { parseRealtimePayload } from "./events";
-export { parseChatGeneralPayload } from "./chatEvents";
-export type { ChatGeneralPayloadByEvent } from "./chatEvents";
+export {
+  CHAT_GENERAL_SERVER_EVENTS,
+  parseChatGeneralAck,
+  parseChatGeneralPayload,
+  parseChatGeneralSocketError,
+} from "./chatEvents";
+export type { ChatGeneralPayloadByEvent, ChatGeneralServerEvent } from "./chatEvents";
 export { removePresenceUser, replacePresenceUsers, upsertPresenceUser } from "./presenceMap";
-export { resumeGeneralSocket, useGeneralSocket } from "./useGeneralSocket";
-export type { GeneralSocketState, UseGeneralSocketOptions } from "./useGeneralSocket";
+export { useGeneralSocket } from "./useGeneralSocket";
+export type {
+  GeneralSocketBlock,
+  GeneralSocketHandlers,
+  GeneralSocketState,
+  RecentPresence,
+  UseGeneralSocketOptions,
+} from "./useGeneralSocket";
 export {
   SocketProvider,
   budgetLowCopy,

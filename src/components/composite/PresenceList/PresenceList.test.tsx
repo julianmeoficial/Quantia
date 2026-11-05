@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { ThemeProvider } from "styled-components";
 import { describe, expect, it } from "vitest";
 
+import { LUIS_ID, presenceUser } from "@/test/chatFixtures";
 import { theme } from "@/theme";
 
 import { PresenceList } from "./PresenceList";
@@ -17,14 +18,32 @@ describe("PresenceList", () => {
       <PresenceList
         connectionState="connected"
         users={[
-          { id: "11111111-1111-4111-8111-111111111111", name: "Ana Pérez", avatarUrl: null },
-          { id: "22222222-2222-4222-8222-222222222222", name: "Luis Gómez", avatarUrl: null },
+          presenceUser({ name: "Ana Pérez" }),
+          presenceUser({ id: LUIS_ID, name: "Luis Gómez", avatar: "AVATAR_02" }),
         ]}
       />,
     );
     expect(screen.getByText("2 en línea")).toBeInTheDocument();
     expect(screen.getByText("Ana Pérez")).toBeInTheDocument();
     expect(screen.getByText("Luis Gómez")).toBeInTheDocument();
+  });
+
+  it("shows who is typing and who left recently", () => {
+    renderWithTheme(
+      <PresenceList
+        connectionState="connected"
+        users={[presenceUser({ name: "Ana Pérez" })]}
+        typingIds={new Set([presenceUser().id])}
+        recent={[
+          {
+            user: presenceUser({ id: LUIS_ID, name: "Luis Gómez" }),
+            lastSeenAt: "2026-11-04T20:05:00.000Z",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("escribiendo…")).toBeInTheDocument();
+    expect(screen.getByText(/visto por última vez a las 15:05/)).toBeInTheDocument();
   });
 
   it("shows an empty copy when nobody is online", () => {
