@@ -6,7 +6,8 @@ import { useEffect, type ReactNode } from "react";
 import { AppShell } from "@/components/page/AppShell";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { NavBoot } from "@/features/auth/NavBoot";
-import { buildLoginHref } from "@/lib/auth";
+import { useChatUnread } from "@/features/chat-general/useChatUnread";
+import { buildLoginHref, isChatPath } from "@/lib/auth";
 import { useSocketContext } from "@/lib/socket";
 
 function currentHref(pathname: string): string {
@@ -22,6 +23,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const { status, identity, logout, endExpiredSession } = useAuth();
   const { connection, connectionPaused, reconnect, notices, unreadCount, markNoticesRead } =
     useSocketContext();
+  const chatUnread = useChatUnread(isChatPath(pathname));
 
   useEffect(() => {
     if (status === "anonymous") router.replace(buildLoginHref(currentHref(pathname)));
@@ -35,6 +37,8 @@ export function AppFrame({ children }: { children: ReactNode }) {
     <AppShell
       identity={identity}
       pathname={pathname}
+      chatEnabled={chatUnread.chatEnabled}
+      navBadges={{ "/chat": chatUnread.unreadCount }}
       connection={connection}
       connectionPaused={connectionPaused}
       onReconnect={reconnect}

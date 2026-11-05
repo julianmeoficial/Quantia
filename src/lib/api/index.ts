@@ -3,11 +3,17 @@ export type { SessionGrant } from "./auth";
 export { api, buildApiUrl, readRetryAfterSeconds, request, type RequestOptions } from "./client";
 export {
   createGeneralChatMessage,
+  deleteGeneralChatMessage,
+  editGeneralChatMessage,
   GENERAL_CHAT_MESSAGE_MAX,
+  getGeneralChatState,
   listGeneralChatMessages,
+  listGeneralChatUpdates,
+  markGeneralChatRead,
+  removeGeneralChatReaction,
+  setGeneralChatReaction,
 } from "./chat";
-export type { CreateGeneralChatMessageResponse } from "./chat";
-export { insertChatMessageInCache } from "./chatCache";
+export type { SendGeneralChatMessageInput } from "./chat";
 export {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
@@ -38,6 +44,7 @@ export {
   expireSession,
   getAccessToken,
   onAccessToken,
+  onAccessTokenChange,
   onSessionExpired,
   setAccessToken,
 } from "./session";
@@ -47,7 +54,9 @@ export {
   deleteUser,
   getMe,
   getUser,
+  listAvatars,
   listUsers,
   searchUserDirectory,
+  updateMyAvatar,
   updateUser,
 } from "./users";

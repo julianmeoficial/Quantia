@@ -24,6 +24,7 @@ export {
   canManageMembers,
   canManageProject,
   canManageUsers,
+  canModerateChat,
   canRetrySync,
   canSearchUsers,
   canViewAudit,

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { DropdownMenu as DropdownMenuPrimitive, Popover as PopoverPrimitive } from "radix-ui";
-import styled from "styled-components";
+import styled, { css, keyframes } from "styled-components";
 
 import { Avatar, initialsFromName, Link } from "@/components/base";
 import { focusRing } from "@/components/base/shared/focus";
@@ -83,7 +83,52 @@ const AccountButton = styled.button`
   ${focusRing}
 `;
 
+const floatIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+`;
+
+const badgePop = keyframes`
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+`;
+
+/** Radix popovers/menus: 150 ms rise from their own transform origin; static if reduced. */
+const floatingMotion = css`
+  transform-origin: var(
+    --radix-popover-content-transform-origin,
+    var(--radix-dropdown-menu-content-transform-origin, top right)
+  );
+
+  &[data-state="open"] {
+    animation: ${floatIn} ${({ theme }) => theme.motion.duration.fast}
+      ${({ theme }) => theme.motion.easing.standard};
+  }
+
+  ${({ theme }) => theme.media.reducedMotion} {
+    &[data-state="open"] {
+      animation: none;
+    }
+  }
+`;
+
 const Panel = styled(PopoverPrimitive.Content)`
+  ${floatingMotion}
   z-index: ${({ theme }) => theme.zIndices.overlay};
   width: calc(${({ theme }) => theme.layout.sidebar} + ${({ theme }) => theme.space[32]});
   max-height: min(70vh, 28rem);
@@ -151,6 +196,7 @@ const Empty = styled.p`
 `;
 
 const Menu = styled(DropdownMenuPrimitive.Content)`
+  ${floatingMotion}
   z-index: ${({ theme }) => theme.zIndices.overlay};
   min-width: ${({ theme }) => theme.layout.sidebar};
   padding: ${({ theme }) => theme.space[8]};
@@ -206,6 +252,12 @@ const CountBadge = styled.span`
   font-size: ${({ theme }) => theme.typography.caption.fontSize};
   line-height: ${({ theme }) => theme.space[16]};
   text-align: center;
+  animation: ${badgePop} ${({ theme }) => theme.motion.duration.slow}
+    ${({ theme }) => theme.motion.easing.standard};
+
+  ${({ theme }) => theme.media.reducedMotion} {
+    animation: none;
+  }
 `;
 
 const LiveRegion = styled.div`
@@ -297,7 +349,9 @@ export function AppHeader({
             <NoticeButton type="button" aria-label={badgeLabel}>
               Avisos
               {unreadCount > 0 ? (
-                <CountBadge aria-hidden>{unreadCount > 9 ? "9+" : unreadCount}</CountBadge>
+                <CountBadge key={unreadCount} aria-hidden>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </CountBadge>
               ) : null}
             </NoticeButton>
           </PopoverPrimitive.Trigger>

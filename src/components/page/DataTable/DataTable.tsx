@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Pagination } from "@/components/composite/Pagination";
 import type { PaginationProps } from "@/components/composite/Pagination";
 import { Skeleton } from "@/components/system";
+import { useGsapReveal } from "@/lib/motion";
 
 import * as S from "./DataTable.styles";
 
@@ -49,6 +50,15 @@ export function DataTable<T>({
   highlightedId,
   pagination,
 }: DataTableProps<T>) {
+  // Reveal on first data and on page change only — never on live row patches.
+  const scope = useGsapReveal<HTMLDivElement>({
+    selector: "tbody tr",
+    y: 6,
+    stagger: 0.025,
+    disabled: isLoading || rows.length === 0,
+    dependencies: [pagination?.page ?? 0, rows.length > 0],
+  });
+
   if (isLoading) {
     return <Skeleton variant="table" />;
   }
@@ -58,7 +68,7 @@ export function DataTable<T>({
   }
 
   return (
-    <S.Root>
+    <S.Root ref={scope}>
       <S.Region role="region" tabIndex={0} aria-label={caption}>
         <S.Table>
           <S.Caption>{caption}</S.Caption>

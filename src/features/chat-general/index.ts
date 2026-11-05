@@ -1,3 +1,5 @@
 export { GeneralChatScreen } from "./GeneralChatScreen";
-export { daySeparatorLabel, groupMessagesByDay } from "./groupMessagesByDay";
-export { mergeChatMessages } from "./mergeChatMessages";
+export { useChatUnread } from "./useChatUnread";
+export type { ChatUnreadState } from "./useChatUnread";
+export { buildChatRows, daySeparatorLabel } from "./groupMessagesByDay";
+export { createChatReducer, selectOrderedEntries } from "./chatReducer";

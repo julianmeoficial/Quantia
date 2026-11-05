@@ -1,8 +1,10 @@
 import {
+  avatarCatalogResponseSchema,
   createUserRequestSchema,
   paginatedUserDirectoryResponseSchema,
   paginatedUsersResponseSchema,
   paginationQuerySchema,
+  updateMyAvatarRequestSchema,
   updateUserRequestSchema,
   userDirectoryQuerySchema,
   userResponseSchema,
@@ -10,6 +12,8 @@ import {
   type PaginatedUserDirectoryResponse,
   type PaginatedUsersResponse,
   type PaginationQuery,
+  type AvatarCatalogResponse,
+  type AvatarKey,
   type UpdateUserRequest,
   type UserDirectoryQuery,
   type UserResponse,
@@ -31,6 +35,17 @@ export function getMe(options?: { refresh?: boolean }): Promise<UserResponse> {
     schema: userResponseSchema,
     retryUnauthorized: options?.refresh ?? true,
   });
+}
+
+/** Catalog of the 5 predefined avatars (no photo uploads exist). */
+export function listAvatars(): Promise<AvatarCatalogResponse> {
+  return api.get("/users/avatars", { schema: avatarCatalogResponseSchema });
+}
+
+/** Required before using Chat General (`avatarRequired`). Emits `usuario-actualizado`. */
+export function updateMyAvatar(avatar: AvatarKey): Promise<UserResponse> {
+  const parsed = updateMyAvatarRequestSchema.parse({ avatar });
+  return api.patch("/users/me/avatar", parsed, { schema: userResponseSchema });
 }
 
 export function searchUserDirectory(

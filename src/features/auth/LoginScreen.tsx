@@ -8,10 +8,12 @@ import { Button, TextField } from "@/components/base";
 import { ApiError } from "@/lib/api/errors";
 import { useRateLimitLock } from "@/lib/async/useRateLimitLock";
 import { landing, postLoginHref } from "@/lib/auth";
+import { useGsapReveal } from "@/lib/motion";
 
 import { useAuth } from "./AuthProvider";
-import { NavBoot } from "./NavBoot";
 import * as S from "./LoginScreen.styles";
+import { NavBoot } from "./NavBoot";
+import { ResearchThreadArt } from "./ResearchThreadArt";
 
 const INVALID_CREDENTIALS = "Correo o contraseña incorrectos";
 const LOAD_ERROR = "Algo salió mal. Vuelve a intentarlo en unos segundos.";
@@ -57,6 +59,16 @@ export function LoginScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const rateLimit = useRateLimitLock();
+  const showForm = !(
+    status === "booting" ||
+    (status === "authenticated" && user && landing(user.roles))
+  );
+  const introRef = useGsapReveal<HTMLElement>({
+    selector: "[data-intro]",
+    y: 12,
+    stagger: 0.06,
+    disabled: !showForm,
+  });
 
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
@@ -64,7 +76,7 @@ export function LoginScreen() {
     if (href) router.replace(href);
   }, [status, user, router, from]);
 
-  if (status === "booting" || (status === "authenticated" && user && landing(user.roles))) {
+  if (!showForm) {
     return <NavBoot />;
   }
 
@@ -116,17 +128,18 @@ export function LoginScreen() {
   }
 
   return (
-    <S.Page>
+    <S.Page ref={introRef}>
       <S.FormColumn>
-        <S.Brand>
+        <S.Brand data-intro>
           <S.BrandName>Quantia</S.BrandName>
           <S.Tagline>Tu espacio de investigación</S.Tagline>
         </S.Brand>
-        <S.Intro>
+        <S.Intro data-intro>
           <S.Title>Bienvenido de nuevo</S.Title>
           <S.Subtitle>Entra para continuar con tus proyectos.</S.Subtitle>
         </S.Intro>
         <S.Form
+          data-intro
           onSubmit={onSubmit}
           noValidate
           aria-describedby={formError ? formErrorId : undefined}
@@ -181,9 +194,10 @@ export function LoginScreen() {
       </S.FormColumn>
       <S.Divider aria-hidden />
       <S.Panel>
-        <S.Eyebrow>Investigar, con claridad</S.Eyebrow>
-        <S.Headline>Gestiona menos e Investiga más.</S.Headline>
-        <S.Support>Proyectos, tareas y evidencia en un espacio confiable.</S.Support>
+        <ResearchThreadArt />
+        <S.Eyebrow data-intro>Investigar, con claridad</S.Eyebrow>
+        <S.Headline data-intro>Gestiona menos e investiga más.</S.Headline>
+        <S.Support data-intro>Proyectos, tareas y evidencia en un espacio confiable.</S.Support>
       </S.Panel>
     </S.Page>
   );

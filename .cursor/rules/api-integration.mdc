@@ -20,7 +20,7 @@ consumes a closed and hardened NestJS API on Railway (F0–F7, S1–S6, P0–P6,
 - Real time: one Socket.io gateway with namespaces `/projects`, `/notifications` and `/general`.
 
 Sources of truth, in this order:
-1. `@quantia/contracts` v0.7.0: TS types + Zod schemas (enums, requests, responses, event payloads, exposed headers).
+1. `@quantia/contracts` v0.8.0: TS types + Zod schemas (enums, requests, responses, event payloads, exposed headers).
 2. `openapi/openapi.json` in the API repo. Swagger UI (`/api/docs`) exists ONLY locally; staging and production do
    not expose it. Paths in the exported JSON do not include the `/api/v1` prefix.
 3. Design System page (DS): decides HOW states, events and roles are SHOWN. The DS endpoint and payload
@@ -249,8 +249,13 @@ The DS inventory says `PATCH /api/v1/tasks/:id`: the real path is nested (contra
 
 ### 3.9 Chat General — `/chat/general` (can be disabled by config)
 
-`GeneralChatMessage`: `{ id, content, clientMessageId, createdAt, author: { id, name, avatarUrl } }`
-(`clientMessageId`, `avatarUrl` nullable).
+**Contracts 0.8.0 (Chat General v2).** `GeneralChatMessageDto`: `{ id, seq, version, content, clientMessageId,
+createdAt, updatedAt, editedAt, deletedAt, author: PresenceUser, replyTo, reactions }`. Order by `seq`, merge by
+`version`, swap optimistic bubbles by `clientMessageId`. Avatar is mandatory (`GET /users/avatars`,
+`PATCH /users/me/avatar`; `403 AVATAR_REQUIRED` until chosen). Also: `GET /state`, `GET /updates?since|cursor`,
+`PATCH|DELETE /messages/:id`, `PUT|DELETE /messages/:id/reaction`, `PUT /read`. Decide by `statusCode` + `code`.
+Canonical integration guide: `Quantia_API/docs/development/chat-e2e-integration.md`; frontend implementation in
+`.cursor/docs/api-connection.md` (Chat General v2). The v1 notes below remain valid for history/send.
 
 - **GET /messages?cursor&limit** → `{ items, nextCursor, hasMore }`. `limit` default 30, max 100. Order: NEWEST
   FIRST, stable by `createdAt + id`; the UI reverses it to paint. Older pages: `cursor = nextCursor` while `hasMore`.
@@ -408,11 +413,14 @@ Applies to projects, tasks and progress (`syncStatus: PENDING · SYNCED · FAILE
 ### `/general` (Chat General)
 
 - JWT required; after validation the server joins the socket to the fixed room `general` automatically (no `join`).
-- `chat.general.presencia { users: PresenceUser[], generatedAt }` → REPLACE the presence list (also after reconnect).
+- v2 (contracts 0.8.0) adds `usuario-actualizado`, `mensaje-editado`, `mensaje-eliminado`, `reacciones-actualizadas`,
+  `escribiendo`, `lectura` and `error { code }`; client → server `escribiendo { isTyping }` and
+  `reautenticar { token }` (ack). Ready only after `presencia`; after a reconnect, catch up with `/updates`.
+- `chat.general.presencia { users: PresenceUser[], typing, generatedAt, tokenExpiresAt }` → REPLACE the presence list (also after reconnect).
 - `chat.general.usuario-conectado { user, occurredAt }` / `chat.general.usuario-desconectado { userId, occurredAt }`
   → upsert/remove in a `Map` keyed by `userId`. Several tabs of one user count as ONE presence and "disconnected" only
   arrives when the last socket closes: never infer offline from your own tab closing.
-- `PresenceUser` exposes only `id`, `name`, `avatarUrl`: no emails or roles in the chat UI.
+- `PresenceUser` exposes only `id`, `name`, `avatar` (`AVATAR_01…05`), `avatarUrl` (always `null`): no emails or roles in the chat UI.
 - `chat.general.mensaje-creado { message }` → append if its `id` or `clientMessageId` is not already present.
 - Send ALWAYS via REST, never by socket. Optimistic message states:
   - `sending` (generated `clientMessageId`, muted style) → `sent` on 201/200 or the matching `mensaje-creado`.
@@ -503,7 +511,7 @@ Roles (`RoleName`): `INVESTIGADOR`, `COORDINADOR`, `ADMINISTRADOR`; several role
 ## 11. Definition of Done per screen
 
 - [ ] Only `src/lib/api` functions through `features/<domain>/hooks`; zero `fetch` in components.
-- [ ] Types, enums and validation 100 % from `@quantia/contracts` v0.7.0; no extra fields in requests.
+- [ ] Types, enums and validation 100 % from `@quantia/contracts` v0.8.0; no extra fields in requests.
 - [ ] Renders the §5 map with registered DS components: `Skeleton`, `EmptyState`, 400 inline, 401 keeping the draft,
       403, 404, 409, 429 with `Retry-After` countdown, 5xx and `ConnectionStatus`.
 - [ ] `SyncStatus` on projects, tasks and progress; «Generando reporte» persists across navigation; document status.
@@ -520,7 +528,7 @@ Roles (`RoleName`): `INVESTIGADOR`, `COORDINADOR`, `ADMINISTRADOR`; several role
 
 ## 12. Contract gaps (do NOT simulate)
 
-The DS requires these, but they are not in `@quantia/contracts` v0.7.0. Do not render the feature (or render the
+The DS requires these, but they are not in `@quantia/contracts` v0.8.0. Do not render the feature (or render the
 `EmptyState` agreed with design) and open a backend issue in Linear:
 
 | DS need | Missing in the contract | Until it exists |

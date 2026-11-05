@@ -80,12 +80,12 @@ Logout clears access token, drafts (unless expired-session keep), session report
 | `/projects`      | Project workspace mounted      |
 | `/general`       | Chat General (`/chat`) mounted |
 
-Server budget: **5** simultaneous connections per user across tabs/namespaces. Exceeding → pause realtime in this tab (`connectionPaused`); REST continues.
+Server budget: **10** simultaneous connections per user across tabs/namespaces (`WS_MAX_CONNECTIONS_PER_USER`, API v0.1.0+). Exceeding → pause realtime in this tab (`connectionPaused`); REST continues.
 
-**Contract realtime events (v0.7.0):**
+**Contract realtime events (v0.8.0):**
 
 - Projects / notifications: `tarea.actualizada`, `avance.registrado`, `proyecto.retrasado`, `presupuesto.ejecucion-baja`.
-- Chat General (`/general`): `chat.general.presencia`, `chat.general.usuario-conectado`, `chat.general.usuario-desconectado`, `chat.general.mensaje-creado`. Room `general` is joined automatically by the server (no client `join`).
+- Chat General (`/general`, v2): `presencia`, `usuario-conectado`, `usuario-desconectado`, `usuario-actualizado`, `mensaje-creado`, `mensaje-editado`, `mensaje-eliminado`, `reacciones-actualizadas`, `escribiendo`, `lectura` (all prefixed `chat.general.`) plus `error { code }`. Client → server with ack: `chat.general.escribiendo { isTyping }`, `chat.general.reautenticar { token }`. Room `general` is joined automatically by the server (no client `join`).
 
 Events invalidate/patch React Query; they are not the source of truth. After reconnect: re-join (projects) or refetch (chat history) + presence snapshot.
 
@@ -93,9 +93,21 @@ Events invalidate/patch React Query; they are not the source of truth. After rec
 
 **Not in contract — do not subscribe:** `reporte.completado`, `sync.failed`.
 
-### Chat General (DS-118)
+### Chat General v2 (contracts 0.8.0)
 
-Semillero-wide channel (not per project). Route: `/chat` → [`GeneralChatScreen`](../../src/features/chat-general/GeneralChatScreen.tsx) for all authenticated roles (`chatEnabled` in AppShell).
+Semillero-wide channel (not per project). Route: `/chat` → [`GeneralChatScreen`](../../src/features/chat-general/GeneralChatScreen.tsx) for all authenticated roles. Source of truth: `Quantia_API/docs/development/chat-e2e-integration.md`.
+
+| Layer        | Implementation                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST         | [`lib/api/chat.ts`](../../src/lib/api/chat.ts): `state`, history cursor, `updates` feed, send (idempotent `clientMessageId`, optional `replyToId`), edit, delete, reaction put/delete, `read`. Avatars in [`lib/api/users.ts`](../../src/lib/api/users.ts). `ApiError.code` carries the stable API `code`.                                                                                                                                                |
+| Store        | [`chatReducer.ts`](../../src/features/chat-general/chatReducer.ts): order by `seq`, merge by `version` (idempotent), optimistic swap keyed by `clientMessageId`, tombstones mark quotes deleted, read pointers, reaction pop token. Unit-tested.                                                                                                                                                                                                          |
+| Orchestrator | [`useGeneralChat.ts`](../../src/features/chat-general/useGeneralChat.ts): REST bootstrap (independent of the socket) → buffer socket events until hydrated → catch up with `/updates?since=syncPoint−5s` after every reconnect (reload first page if > 24 h). Send retries once on network/5xx with the same `clientMessageId`; 4xx → `failed` (Reintentar/Descartar).                                                                                    |
+| Socket       | [`useGeneralSocket.ts`](../../src/lib/socket/useGeneralSocket.ts): ready on `presencia`; presence + «recientemente» (`lastSeenAt`); typing timers by `expiresInMs`, emit throttled to `typingTtlMs/2`; `reautenticar` on every new access token (own refresh or another tab, `onAccessTokenChange`); `io server disconnect` → manual reconnect with backoff; `AVATAR_REQUIRED` / `CHAT_DISABLED` / `TOO_MANY_CONNECTIONS` stop retries with their own UI. |
+| Avatar       | `avatarRequired` → blocking [`AvatarPickerPanel`](../../src/features/chat-general/AvatarPickerPanel.tsx) (`PATCH /users/me/avatar`, then `AuthProvider.replaceUser`). Glyphs bundled in [`Avatar`](../../src/components/base/Avatar/avatarArt.tsx) (`avatarKey`).                                                                                                                                                                                         |
+| Shell        | [`useChatUnread`](../../src/features/chat-general/useChatUnread.ts) polls `GET /state` (60 s, focus) for the «Chat» nav badge; 404 `CHAT_DISABLED` hides the nav entry. No socket outside `/chat`.                                                                                                                                                                                                                                                        |
+| UX / motion  | Telegram-like groups (< 5 min), day separators, frozen «Mensajes nuevos» divider, ✓/✓✓ «Visto por N», reply quotes with jump + 1.6 s highlight, edit (↑ on empty composer), delete with `ConfirmDialog` (Admin moderates), 8 allowlisted reactions with pop, typing dots, «N mensajes nuevos» pill, scroll anchor on older pages. Motion layout/presence + GSAP first-paint stagger; all honour reduced motion.                                           |
+
+#### v1 notes (DS-118, still valid)
 
 | Layer         | Implementation                                                                                                                                     |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -184,7 +196,7 @@ Run against a live API when available. Automated suite covers unit/component pat
 
 Aligned with SCREENS §10 and `api-integration.mdc` §12:
 
-| Need                       | Contract v0.7.0                                           | Frontend until backend lands                                      |
+| Need                       | Contract v0.8.0                                           | Frontend until backend lands                                      |
 | -------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
 | `reporte.completado`       | Absent                                                    | Polling + Toast (DS-121)                                          |
 | `sync.failed`              | Absent                                                    | REST `syncStatus` + refetch                                       |

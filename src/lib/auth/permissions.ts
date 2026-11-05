@@ -93,3 +93,8 @@ export function canViewAudit(me: UserResponse): boolean {
 export function canRetrySync(me: UserResponse): boolean {
   return isAdmin(me);
 }
+
+/** Chat General moderation: ADMINISTRADOR may delete anyone's message (API is the authority). */
+export function canModerateChat(me: UserResponse): boolean {
+  return isAdmin(me);
+}

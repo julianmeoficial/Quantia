@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { LUIS_ID, presenceUser } from "@/test/chatFixtures";
+
 import { removePresenceUser, replacePresenceUsers, upsertPresenceUser } from "./presenceMap";
 
-const ana = { id: "11111111-1111-4111-8111-111111111111", name: "Ana", avatarUrl: null };
-const luis = { id: "22222222-2222-4222-8222-222222222222", name: "Luis", avatarUrl: null };
+const ana = presenceUser();
+const luis = presenceUser({ id: LUIS_ID, name: "Luis", avatar: "AVATAR_02" });
 
 describe("presenceMap", () => {
   it("replaces the snapshot and dedupes by id", () => {

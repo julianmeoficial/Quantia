@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import styled, { keyframes } from "styled-components";
 
@@ -39,8 +40,11 @@ export const List = styled.ul`
   list-style: none;
 `;
 
-export const Item = styled.li`
+export const Item = styled.li<{ $active?: boolean }>`
+  position: relative;
+
   a {
+    position: relative;
     display: flex;
     align-items: center;
     gap: ${({ theme }) => theme.space[8]};
@@ -63,8 +67,22 @@ export const Item = styled.li`
   }
 
   && a[aria-current="page"] {
-    background: ${({ theme }) => theme.colors.selection.bg};
+    background: transparent;
     color: ${({ theme }) => theme.colors.selection.text};
+    font-weight: ${({ theme }) => theme.typography.label.fontWeight};
+  }
+
+  && a[aria-current="page"]:hover {
+    background: transparent;
+  }
+
+  a svg {
+    transition: transform ${({ theme }) => theme.motion.duration.fast}
+      ${({ theme }) => theme.motion.easing.standard};
+  }
+
+  a:hover svg {
+    transform: translateX(0.125rem);
   }
 
   a:focus {
@@ -78,10 +96,57 @@ export const Item = styled.li`
   }
 
   ${({ theme }) => theme.media.reducedMotion} {
-    a {
+    a,
+    a svg {
       transition: none;
     }
+
+    a:hover svg {
+      transform: none;
+    }
   }
+`;
+
+const badgeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+`;
+
+export const NavBadge = styled.span`
+  margin-left: auto;
+  min-width: ${({ theme }) => theme.space[24]};
+  height: ${({ theme }) => theme.space[24]};
+  padding: 0 ${({ theme }) => theme.space[8]};
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ theme }) => theme.colors.brand.primary};
+  color: ${({ theme }) => theme.colors.brand.onPrimary};
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
+  line-height: ${({ theme }) => theme.space[24]};
+  font-weight: ${({ theme }) => theme.typography.label.fontWeight};
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  animation: ${badgeIn} ${({ theme }) => theme.motion.duration.slow}
+    ${({ theme }) => theme.motion.easing.standard};
+
+  ${({ theme }) => theme.media.reducedMotion} {
+    animation: none;
+  }
+`;
+
+/** Calm selected treatment that glides between rows (Motion `layoutId`, no overshoot). */
+export const ActivePill = styled(motion.span)`
+  position: absolute;
+  inset: 0;
+  border-radius: ${({ theme }) => theme.radii.control};
+  background: ${({ theme }) => theme.colors.selection.bg};
+  box-shadow: inset ${({ theme }) => theme.borderWidths.thick} 0 0
+    ${({ theme }) => theme.colors.brand.primary};
 `;
 
 export const Profile = styled.div`
@@ -141,4 +206,8 @@ export const Drawer = styled(DialogPrimitive.Content)`
       ${({ theme }) => theme.colors.focus.ring};
     outline-offset: ${({ theme }) => theme.borderWidths.thick};
   }
+`;
+
+export const VisuallyHidden = styled.span`
+  ${clip}
 `;

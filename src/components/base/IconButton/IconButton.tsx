@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 
 import { SpinnerIcon } from "@/components/base/icons";
 import type { ControlSize, IconButtonIntent } from "@/components/base/shared/types";
@@ -14,6 +14,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   intent?: IconButtonIntent;
   size?: ControlSize;
   isLoading?: boolean;
+  /** React 19 ref-as-prop (e.g. to restore focus after closing a popover). */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function IconButton({

@@ -15,4 +15,6 @@ export const queryKeys = {
   groupDashboard: (params: unknown) => ["group-dashboard", params] as const,
   institutionalOverview: (params: unknown) => ["institutional-overview", params] as const,
   chatGeneralHistory: ["chat", "general", "messages"] as const,
+  chatGeneralState: ["chat", "general", "state"] as const,
+  avatars: ["users", "avatars"] as const,
 } as const;

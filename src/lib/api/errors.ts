@@ -30,6 +30,8 @@ export class ApiError extends Error {
     message: string = DEFAULT_MESSAGES[kind],
     public readonly details?: unknown,
     public readonly retryAfterSeconds?: number,
+    /** Stable machine code from the API body (`code`), e.g. `AVATAR_REQUIRED`. */
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -55,6 +57,14 @@ function readMessage(body: unknown): string | undefined {
   return undefined;
 }
 
+function readCode(body: unknown): string | undefined {
+  if (typeof body === "object" && body !== null && "code" in body) {
+    const { code } = body;
+    if (typeof code === "string" && /^[A-Z_]{2,64}$/.test(code)) return code;
+  }
+  return undefined;
+}
+
 /**
  * Normaliza una respuesta fallida. En 401/403/404 se usa siempre el mensaje genérico
  * para no revelar la existencia de recursos fuera del alcance del usuario.
@@ -69,5 +79,7 @@ export function toApiError(status: number, body: unknown, retryAfterSeconds?: nu
     message,
     exposeServerMessage ? body : undefined,
     retryAfterSeconds,
+    // `code` es un enum estable del contrato: seguro de exponer (no revela recursos).
+    readCode(body),
   );
 }

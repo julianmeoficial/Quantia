@@ -34,6 +34,7 @@ export const Brand = styled.div`
 
 export const BrandName = styled.p`
   margin: 0;
+  font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.text.primary};
   font-size: ${({ theme }) => theme.typography.headingMedium.fontSize};
   line-height: ${({ theme }) => theme.typography.headingMedium.lineHeight};
@@ -123,19 +124,24 @@ export const Panel = styled.aside`
     display: flex;
     flex-direction: column;
     gap: ${({ theme }) => theme.space[16]};
-    width: 22.5rem;
+    width: 26rem;
     color: ${({ theme }) => theme.colors.text.primary};
   }
 `;
 
 export const Eyebrow = styled.p`
-  margin: 0;
+  margin: ${({ theme }) => theme.space[8]} 0 0;
+  color: ${({ theme }) => theme.colors.brand.primary};
+  font-weight: ${({ theme }) => theme.typography.label.fontWeight};
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
   line-height: ${({ theme }) => theme.typography.bodySmall.lineHeight};
 `;
 
 export const Headline = styled.p`
   margin: 0;
+  font-family: ${({ theme }) => theme.fonts.heading};
+  letter-spacing: ${({ theme }) => theme.typography.displayLarge.letterSpacing};
+  text-wrap: balance;
   font-size: ${({ theme }) => theme.typography.displayLarge.fontSize};
   line-height: ${({ theme }) => theme.typography.displayLarge.lineHeight};
   font-weight: ${({ theme }) => theme.typography.headingLarge.fontWeight};
@@ -143,6 +149,7 @@ export const Headline = styled.p`
 
 export const Support = styled.p`
   margin: 0;
+  color: ${({ theme }) => theme.colors.text.secondary};
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
   line-height: ${({ theme }) => theme.typography.bodySmall.lineHeight};
 `;

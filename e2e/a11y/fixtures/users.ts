@@ -8,6 +8,8 @@ const BASE = {
   email: "a11y@quantia.test",
   fullName: "Usuario Accesibilidad",
   isActive: true,
+  avatar: "AVATAR_01",
+  avatarRequired: false,
   createdAt: NOW,
   updatedAt: NOW,
 } as const;

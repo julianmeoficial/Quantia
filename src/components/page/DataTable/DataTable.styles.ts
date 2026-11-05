@@ -81,6 +81,12 @@ export const Cell = styled.td<{ $align?: "start" | "end" }>`
 
 export const Row = styled.tr`
   ${liveUpdateHighlight}
+  transition: background-color ${({ theme }) => theme.motion.duration.fast}
+    ${({ theme }) => theme.motion.easing.standard};
+
+  &:not([data-highlighted="true"]):hover {
+    background: ${({ theme }) => theme.colors.bg.subtle};
+  }
 `;
 
 export const Footer = styled.div`

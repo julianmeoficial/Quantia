@@ -12,6 +12,27 @@ export const Card = styled.article`
   border: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
   border-radius: ${({ theme }) => theme.radii.card};
+  transition:
+    border-color ${({ theme }) => theme.motion.duration.fast}
+      ${({ theme }) => theme.motion.easing.standard},
+    box-shadow ${({ theme }) => theme.motion.duration.base}
+      ${({ theme }) => theme.motion.easing.standard},
+    transform ${({ theme }) => theme.motion.duration.base}
+      ${({ theme }) => theme.motion.easing.standard};
+
+  &:hover,
+  &:focus-within {
+    border-color: ${({ theme }) => theme.colors.border.control};
+    box-shadow: ${({ theme }) => theme.elevation.sm};
+    transform: translateY(-0.125rem);
+  }
+
+  ${({ theme }) => theme.media.reducedMotion} {
+    &:hover,
+    &:focus-within {
+      transform: none;
+    }
+  }
 `;
 
 export const Header = styled.div`

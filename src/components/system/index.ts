@@ -7,6 +7,8 @@ export type { EmptyStateKind, EmptyStateProps } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export type { ErrorStateProps, ErrorStateVariant } from "./ErrorState";
 export { liveUpdateHighlight } from "./highlight";
+export { PageTransition } from "./PageTransition";
+export type { PageTransitionProps } from "./PageTransition";
 export { Sheet } from "./Sheet";
 export type { SheetProps } from "./Sheet";
 export { Skeleton } from "./Skeleton";
