@@ -50,6 +50,12 @@ const Time = styled.time`
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
 `;
 
+const Evidence = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space[8]} ${({ theme }) => theme.space[16]};
+`;
+
 export interface ActivityItem {
   id: string;
   at: string;
@@ -57,6 +63,11 @@ export interface ActivityItem {
   text: string;
   evidenceHref?: string;
   evidenceLabel?: string;
+  /** Several evidence links; takes precedence over `evidenceHref`. */
+  evidence?: Array<{ href: string; label: string }>;
+  /** Entry actions; the buttons render only when the callback is provided. */
+  onEdit?: () => void;
+  onDelete?: () => void;
   /** When set, renders SyncStatus for the entry (Notion sync). */
   syncStatus?: SyncStatusValue;
   lastSyncedAt?: string;
@@ -100,6 +111,26 @@ export function ActivityTimeline({
               </Text>
               <MetaRow>
                 <Time dateTime={item.at}>{formatDate(item.at, { withTime: true })}</Time>
+                {item.onEdit ? (
+                  <Button
+                    type="button"
+                    intent="ghost"
+                    onClick={item.onEdit}
+                    aria-label={`Editar avance de ${item.actor}`}
+                  >
+                    Editar
+                  </Button>
+                ) : null}
+                {item.onDelete ? (
+                  <Button
+                    type="button"
+                    intent="ghost"
+                    onClick={item.onDelete}
+                    aria-label={`Eliminar avance de ${item.actor}`}
+                  >
+                    Eliminar
+                  </Button>
+                ) : null}
                 {item.syncStatus ? (
                   <SyncStatus
                     status={item.syncStatus}
@@ -112,7 +143,15 @@ export function ActivityTimeline({
                   />
                 ) : null}
               </MetaRow>
-              {item.evidenceHref && item.evidenceLabel ? (
+              {item.evidence && item.evidence.length > 0 ? (
+                <Evidence>
+                  {item.evidence.map((link) => (
+                    <Link key={link.href} href={link.href} external>
+                      {link.label}
+                    </Link>
+                  ))}
+                </Evidence>
+              ) : item.evidenceHref && item.evidenceLabel ? (
                 <Link href={item.evidenceHref} external>
                   {item.evidenceLabel}
                 </Link>

@@ -360,6 +360,32 @@ export function GroupDashboardScreen() {
             />
           </S.Section>
 
+          <S.Section aria-labelledby="dashboard-detail">
+            <S.SectionHeading>
+              <S.SectionTitle id="dashboard-detail">Detalle de proyectos</S.SectionTitle>
+              <Link href="/proyectos">ver todos</Link>
+            </S.SectionHeading>
+            <DataTable
+              caption="Detalle de proyectos"
+              columns={columns}
+              rows={data.projects}
+              getRowId={(row) => row.id}
+              isLoading={status === "loading"}
+              emptyState={tableEmpty}
+              pagination={
+                data.totalProjects > 0
+                  ? {
+                      page: values.page,
+                      pageSize: values.pageSize,
+                      totalItems: data.totalProjects,
+                      onPageChange: (page) => setFilters({ page }),
+                      onPageSizeChange: (pageSize) => setFilters({ page: 1, pageSize }),
+                    }
+                  : undefined
+              }
+            />
+          </S.Section>
+
           <S.Section aria-labelledby="dashboard-charts">
             <S.SectionTitle id="dashboard-charts">¿Dónde está la desviación?</S.SectionTitle>
             {noFilteredProjects ? (
@@ -432,32 +458,6 @@ export function GroupDashboardScreen() {
                 ) : null}
               </>
             )}
-          </S.Section>
-
-          <S.Section aria-labelledby="dashboard-detail">
-            <S.SectionHeading>
-              <S.SectionTitle id="dashboard-detail">Detalle de proyectos</S.SectionTitle>
-              <Link href="/proyectos">ver todos</Link>
-            </S.SectionHeading>
-            <DataTable
-              caption="Detalle de proyectos"
-              columns={columns}
-              rows={data.projects}
-              getRowId={(row) => row.id}
-              isLoading={status === "loading"}
-              emptyState={tableEmpty}
-              pagination={
-                data.totalProjects > 0
-                  ? {
-                      page: values.page,
-                      pageSize: values.pageSize,
-                      totalItems: data.totalProjects,
-                      onPageChange: (page) => setFilters({ page }),
-                      onPageSizeChange: (pageSize) => setFilters({ page: 1, pageSize }),
-                    }
-                  : undefined
-              }
-            />
           </S.Section>
         </>
       ) : null}

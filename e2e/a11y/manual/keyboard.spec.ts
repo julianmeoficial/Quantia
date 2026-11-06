@@ -162,7 +162,7 @@ test.describe("F-03 Administrador — teclado + estructura", () => {
     { path: "/presupuesto", h1: /Presupuesto/i },
     { path: "/reportes", h1: /Reportes/i },
     { path: "/auditoria", h1: /Auditoría/i },
-    { path: `/convocatorias/${PROJECT_ID}`, h1: /.+/ },
+    { path: "/convocatorias", h1: /Convocatorias/i },
   ] as const) {
     test(`${route.path}: skip + h1`, async ({ page }) => {
       await page.goto(route.path, { waitUntil: "networkidle" });

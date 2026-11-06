@@ -10,10 +10,12 @@ import {
   type UpdateTaskRequest,
   updateTaskRequestSchema,
 } from "@quantia/contracts";
+import { z } from "zod";
 
 import { api } from "./client";
 
 const MAX_PAGE_SIZE = 50;
+const emptyResponseSchema = z.undefined();
 
 function clampPageSize(pageSize: number | undefined): number {
   return Math.min(pageSize ?? 20, MAX_PAGE_SIZE);
@@ -57,5 +59,11 @@ export function updateProjectTask(
   const parsed = updateTaskRequestSchema.parse(body);
   return api.patch(`/projects/${projectId}/tasks/${taskId}`, parsed, {
     schema: taskResponseSchema,
+  });
+}
+
+export function deleteProjectTask(projectId: string, taskId: string): Promise<void> {
+  return api.delete(`/projects/${projectId}/tasks/${taskId}`, {
+    schema: emptyResponseSchema,
   });
 }

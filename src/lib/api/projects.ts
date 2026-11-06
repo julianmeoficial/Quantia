@@ -1,9 +1,11 @@
 import {
+  addProjectMemberRequestSchema,
   createProjectRequestSchema,
   listProjectsQuerySchema,
   paginatedProjectsResponseSchema,
   projectResponseSchema,
   updateProjectRequestSchema,
+  type AddProjectMemberRequest,
   type CreateProjectRequest,
   type ListProjectsQuery,
   type PaginatedProjectsResponse,
@@ -59,6 +61,22 @@ export function updateProject(
 
 export function deleteProject(projectId: string): Promise<void> {
   return api.delete(`/projects/${projectId}`, {
+    schema: emptyResponseSchema,
+  });
+}
+
+export function addProjectMember(
+  projectId: string,
+  body: AddProjectMemberRequest,
+): Promise<ProjectResponse> {
+  const parsed = addProjectMemberRequestSchema.parse(body);
+  return api.post(`/projects/${projectId}/members`, parsed, {
+    schema: projectResponseSchema,
+  });
+}
+
+export function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  return api.delete(`/projects/${projectId}/members/${userId}`, {
     schema: emptyResponseSchema,
   });
 }

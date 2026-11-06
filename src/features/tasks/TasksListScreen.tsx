@@ -1,11 +1,11 @@
 "use client";
 
-import type { TaskResponse, UserResponse } from "@quantia/contracts";
-import { useMemo, useRef, useState } from "react";
+import type { TaskResponse, TaskStatus } from "@quantia/contracts";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Badge, Button, Link, Select, TASK_STATUS_PRESENTATION } from "@/components/base";
-import { FilterBar, type FilterChip } from "@/components/composite";
+import { Button, Link, Select } from "@/components/base";
+import { FilterBar, TaskStatusControl, type FilterChip } from "@/components/composite";
 import { DataTable, type DataTableColumn } from "@/components/page";
 import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -21,28 +21,25 @@ import {
   tasksListFiltersSchema,
   type TasksListFilters,
 } from "@/features/filters";
-import { EditTaskPanel } from "@/features/projects/EditTaskPanel";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
+import { updateProjectTask } from "@/lib/api";
+import { ApiError } from "@/lib/api/errors";
 import { canAccess, canCreateTask, canEditTask } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate } from "@/lib/format";
 import { useUrlFilters } from "@/lib/url";
 
 import { CreateTaskPanel } from "./CreateTaskPanel";
+import { EditTaskPanel } from "./EditTaskPanel";
+import { memberLabel, projectMemberOptions } from "./memberLabels";
 import * as S from "./sectionPage.styles";
 import { useProjectTasksList } from "./useProjectTasksList";
 
-function actorLabel(userId: string | null, me: UserResponse): string {
-  if (!userId) return "Sin asignar";
-  if (userId === me.id) return me.fullName;
-  return "Integrante del proyecto";
-}
-
-function StatusCell({ status }: { status: TaskResponse["status"] }) {
-  const presentation = TASK_STATUS_PRESENTATION[status];
-  const Icon = presentation.icon;
-  return <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />;
-}
+const PRIORITY_LABEL: Record<TaskResponse["priority"], string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+};
 
 export function TasksListScreen() {
   return (
@@ -77,6 +74,7 @@ function TasksListBody() {
       projectId: values.projectId,
       status: values.status,
       priority: values.priority,
+      assigneeId: values.assigneeId,
       page: values.page,
       pageSize: values.pageSize,
       sortBy: values.sortBy,
@@ -89,7 +87,6 @@ function TasksListBody() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editTask, setEditTask] = useState<TaskResponse | null>(null);
-  const [editFocus, setEditFocus] = useState<"assignee" | "dueDate">("assignee");
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
     title: "",
@@ -99,6 +96,14 @@ function TasksListBody() {
   const allowed = canAccess("/tareas", roles);
   const canCreate = Boolean(user && selectedProject && canCreateTask(user, selectedProject));
 
+  const assigneeOptions = useMemo(() => {
+    if (!user || !selectedProject) return [{ value: "", label: "Todos los responsables" }];
+    return [
+      { value: "", label: "Todos los responsables" },
+      ...projectMemberOptions(selectedProject, user),
+    ];
+  }, [selectedProject, user]);
+
   const chips = useMemo((): FilterChip[] => {
     const next: FilterChip[] = [];
     if (values.status !== ALL_STATUSES) {
@@ -107,8 +112,35 @@ function TasksListBody() {
     if (values.priority !== ALL_PRIORITIES) {
       next.push({ id: "priority", label: `Prioridad: ${taskPriorityChipLabel(values.priority)}` });
     }
+    if (values.assigneeId && user) {
+      next.push({
+        id: "assigneeId",
+        label: `Responsable: ${memberLabel(values.assigneeId, user)}`,
+      });
+    }
     return next;
-  }, [values.priority, values.status]);
+  }, [user, values.assigneeId, values.priority, values.status]);
+
+  const changeStatus = useCallback(
+    async (row: TaskResponse, next: TaskStatus) => {
+      if (!selectedProject) return;
+      try {
+        await updateProjectTask(selectedProject.id, row.id, { status: next });
+        setToast({ open: true, title: "Estado actualizado", description: row.title });
+        reload();
+      } catch (cause: unknown) {
+        const apiError = cause instanceof ApiError ? cause : new ApiError("unknown", null);
+        setToast({
+          open: true,
+          title:
+            apiError.kind === "forbidden"
+              ? "No tienes permiso para cambiar el estado"
+              : "No se pudo cambiar el estado",
+        });
+      }
+    },
+    [reload, selectedProject],
+  );
 
   const columns = useMemo((): DataTableColumn<TaskResponse>[] => {
     if (!user || !selectedProject) return [];
@@ -123,12 +155,27 @@ function TasksListBody() {
       {
         id: "status",
         header: "Estado",
-        cell: (row) => <StatusCell status={row.status} />,
+        cell: (row) => (
+          <TaskStatusControl
+            status={row.status}
+            title={row.title}
+            onChange={
+              canEditTask(user, selectedProject, row)
+                ? (next) => void changeStatus(row, next)
+                : undefined
+            }
+          />
+        ),
+      },
+      {
+        id: "priority",
+        header: "Prioridad",
+        cell: (row) => PRIORITY_LABEL[row.priority],
       },
       {
         id: "assignee",
         header: "Responsable",
-        cell: (row) => actorLabel(row.assigneeId, user),
+        cell: (row) => memberLabel(row.assigneeId, user),
       },
       {
         id: "dueDate",
@@ -145,7 +192,6 @@ function TasksListBody() {
               type="button"
               onClick={() => {
                 setEditTask(row);
-                setEditFocus("assignee");
                 setEditOpen(true);
               }}
             >
@@ -156,7 +202,7 @@ function TasksListBody() {
           ),
       },
     ];
-  }, [selectedProject, user]);
+  }, [changeStatus, selectedProject, user]);
 
   const rows = useMemo(() => {
     const list = data?.data ?? [];
@@ -167,7 +213,10 @@ function TasksListBody() {
   const total = data?.meta.total ?? 0;
   const isBootLoading =
     Boolean(values.projectId) && (status === "idle" || (status === "loading" && !data));
-  const filterExtrasActive = values.status !== ALL_STATUSES || values.priority !== ALL_PRIORITIES;
+  const filterExtrasActive =
+    values.status !== ALL_STATUSES ||
+    values.priority !== ALL_PRIORITIES ||
+    Boolean(values.assigneeId);
 
   if (!allowed) {
     return (
@@ -225,7 +274,7 @@ function TasksListBody() {
         label="Proyecto"
         options={projectsState.options}
         value={values.projectId}
-        onValueChange={(projectId) => setFilters({ projectId, page: 1 })}
+        onValueChange={(projectId) => setFilters({ projectId, page: 1, assigneeId: "" })}
       />
 
       {values.projectId ? (
@@ -237,6 +286,7 @@ function TasksListBody() {
           onRemoveChip={(id) => {
             if (id === "status") setFilters({ status: ALL_STATUSES, page: 1 });
             if (id === "priority") setFilters({ priority: ALL_PRIORITIES, page: 1 });
+            if (id === "assigneeId") setFilters({ assigneeId: "", page: 1 });
           }}
           onClear={
             filterExtrasActive || localSearch
@@ -245,6 +295,7 @@ function TasksListBody() {
                   setFilters({
                     status: ALL_STATUSES,
                     priority: ALL_PRIORITIES,
+                    assigneeId: "",
                     page: 1,
                   });
                 }
@@ -268,6 +319,12 @@ function TasksListBody() {
             onValueChange={(priority) =>
               setFilters({ priority: priority as TasksListFilters["priority"], page: 1 })
             }
+          />
+          <Select
+            label="Responsable"
+            options={assigneeOptions}
+            value={values.assigneeId}
+            onValueChange={(assigneeId) => setFilters({ assigneeId, page: 1 })}
           />
           <Select
             label="Orden"
@@ -337,6 +394,7 @@ function TasksListBody() {
                         setFilters({
                           status: ALL_STATUSES,
                           priority: ALL_PRIORITIES,
+                          assigneeId: "",
                           page: 1,
                         })
                       }
@@ -381,10 +439,14 @@ function TasksListBody() {
             project={selectedProject}
             task={editTask}
             me={user}
-            focusField={editFocus}
             triggerRef={editTriggerRef}
             onSuccess={(task) => {
               setToast({ open: true, title: "Tarea actualizada", description: task.title });
+              reload();
+            }}
+            onDeleted={() => {
+              setToast({ open: true, title: "Tarea eliminada" });
+              setEditTask(null);
               reload();
             }}
           />

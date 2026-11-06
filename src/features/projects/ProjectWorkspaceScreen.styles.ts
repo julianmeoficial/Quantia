@@ -129,6 +129,10 @@ export const TaskList = styled.ul`
 export const TaskListItem = styled.li`
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: ${({ theme }) => theme.space[8]};
 `;
 
 export const Centered = styled.div`

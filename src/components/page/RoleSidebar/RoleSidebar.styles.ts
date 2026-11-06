@@ -118,6 +118,17 @@ const badgeIn = keyframes`
   }
 `;
 
+export const SoonTag = styled.span`
+  margin-left: auto;
+  padding: 0 ${({ theme }) => theme.space[8]};
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ theme }) => theme.colors.status.info.bg};
+  color: ${({ theme }) => theme.colors.status.info.text};
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
+  line-height: ${({ theme }) => theme.typography.caption.lineHeight};
+  font-weight: ${({ theme }) => theme.typography.label.fontWeight};
+`;
+
 export const NavBadge = styled.span`
   margin-left: auto;
   min-width: ${({ theme }) => theme.space[24]};

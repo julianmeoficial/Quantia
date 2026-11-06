@@ -1,5 +1,7 @@
 export { CreateProjectPanel } from "./CreateProjectPanel";
 export type { CreateProjectPanelProps } from "./CreateProjectPanel";
+export { EditProjectPanel } from "./EditProjectPanel";
+export type { EditProjectPanelProps } from "./EditProjectPanel";
 export { EditTaskPanel } from "./EditTaskPanel";
 export type { EditTaskPanelProps } from "./EditTaskPanel";
 export { ProjectWorkspaceScreen } from "./ProjectWorkspaceScreen";

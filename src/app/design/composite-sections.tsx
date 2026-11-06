@@ -5,6 +5,7 @@ import styled from "styled-components";
 
 import { Button, Select } from "@/components/base";
 import {
+  DatePicker,
   DateRangePicker,
   FileUploader,
   FilterBar,
@@ -93,6 +94,7 @@ export function DesignCompositeSections() {
     from: "2026-10-01T05:00:00.000Z",
     to: "2026-10-15T05:00:00.000Z",
   });
+  const [dueDate, setDueDate] = useState<string | null>("2026-10-15T19:30:00.000Z");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<DataTableSort | null>({ columnId: "name", direction: "asc" });
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -146,6 +148,16 @@ export function DesignCompositeSections() {
             />
             <DateRangePicker label="Periodo" value={range} onChange={setRange} />
           </FilterBar>
+        </Block>
+        <Block>
+          <Caption>DatePicker</Caption>
+          <DatePicker
+            label="Fecha límite"
+            value={dueDate}
+            onValueChange={setDueDate}
+            withTime
+            required
+          />
         </Block>
         <Block>
           <Caption>Pagination</Caption>

@@ -133,6 +133,8 @@ const ICONS: Record<string, (props: IconProps) => ReactNode> = {
   "/usuarios": UsersIcon,
   "/reportes": ChartIcon,
   "/chat": ChatIcon,
+  "/convocatorias": ListIcon,
+  "/auditoria": ClockIcon,
 };
 
 export function iconForHref(href: string): ReactNode {

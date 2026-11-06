@@ -1,5 +1,6 @@
 "use client";
 
+import type { AvatarKey } from "@quantia/contracts";
 import type { ReactNode } from "react";
 import { DropdownMenu as DropdownMenuPrimitive, Popover as PopoverPrimitive } from "radix-ui";
 import styled, { css, keyframes } from "styled-components";
@@ -291,6 +292,8 @@ export interface AppHeaderProps {
   connection: ConnectionState;
   onReconnect?: () => void;
   userName: string;
+  /** Account profile avatar; falls back to initials when null. */
+  avatarKey?: AvatarKey | null;
   roleLabel?: string;
   menu?: ReactNode;
   onLogout?: () => void;
@@ -305,6 +308,7 @@ export function AppHeader({
   connection,
   onReconnect,
   userName,
+  avatarKey = null,
   roleLabel,
   menu,
   onLogout,
@@ -389,7 +393,7 @@ export function AppHeader({
               type="button"
               aria-label={`${initialsFromName(userName)}, cuenta de ${userName}`}
             >
-              <Avatar name={userName} announceName={false} />
+              <Avatar name={userName} avatarKey={avatarKey} announceName={false} />
             </AccountButton>
           </DropdownMenuPrimitive.Trigger>
           <DropdownMenuPrimitive.Portal>

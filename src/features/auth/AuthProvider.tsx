@@ -64,7 +64,7 @@ export function resetAuthBoot() {
 
 function identityOf(user: UserResponse | null): SessionIdentity | null {
   if (!user) return null;
-  return { displayName: user.fullName, roles: user.roles };
+  return { displayName: user.fullName, roles: user.roles, avatar: user.avatar };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

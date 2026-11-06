@@ -7,18 +7,11 @@ export const Screen = styled.section`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space[16]};
-  min-height: 0;
   flex: 1;
-  /* Fill the viewport below the shell header; the log scrolls, never the page. */
-  height: calc(100dvh - ${({ theme }) => theme.layout.header} - ${({ theme }) => theme.space[64]});
-  min-height: calc(${({ theme }) => theme.space[64]} * 7);
-
-  ${({ theme }) => theme.media.up("lg")} {
-    height: calc(
-      100dvh - ${({ theme }) => theme.layout.header} - ${({ theme }) => theme.space[64]} -
-        ${({ theme }) => theme.space[32]}
-    );
-  }
+  min-height: 0;
+  /* The shell is locked to the viewport on this route: the log scrolls, never the page. */
+  height: 100%;
+  min-height: calc(${({ theme }) => theme.space[64]} * 6);
 `;
 
 export const Header = styled.header`
@@ -120,7 +113,13 @@ export const Scroller = styled.div`
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior: contain;
+  /* Never chain the scroll to the page; block the Mac two-finger "back" swipe over messages. */
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+  /* Vertical pan belongs to the list; horizontal drags are reserved for swipe-to-reply. */
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
   overflow-anchor: none;
   scrollbar-gutter: stable;
   padding: ${({ theme }) => theme.space[8]} ${({ theme }) => theme.space[16]}

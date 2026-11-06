@@ -1,5 +1,6 @@
 "use client";
 
+import type { AvatarKey } from "@quantia/contracts";
 import { LayoutGroup } from "motion/react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useId, type ReactNode } from "react";
@@ -10,9 +11,14 @@ import { transitions } from "@/lib/motion";
 import * as S from "./RoleSidebar.styles";
 
 export interface RoleNavItem {
+  /** Section path, used to mark the active item. */
   href: string;
+  /** Where the link goes when it differs from `href` (e.g. with `?projectId=`). */
+  to?: string;
   label: string;
   icon?: ReactNode;
+  /** Section still being built: shows a «Pronto» tag next to the label. */
+  soon?: boolean;
   /** Unread counter (e.g. Chat). Announced in the link name; 0 hides it. */
   badge?: number;
 }
@@ -22,6 +28,8 @@ export interface RoleSidebarProps {
   items: RoleNavItem[];
   currentPath: string;
   profileName: string;
+  /** Account profile avatar; falls back to initials when null. */
+  avatarKey?: AvatarKey | null;
   variant?: "inline" | "drawer";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -37,8 +45,10 @@ function Navigation({
   items,
   currentPath,
   profileName,
+  avatarKey = null,
   fill = false,
 }: Required<Pick<RoleSidebarProps, "label" | "items" | "currentPath" | "profileName">> & {
+  avatarKey?: AvatarKey | null;
   fill?: boolean;
 }) {
   // One LayoutGroup per instance so the inline rail and the drawer never share the pill.
@@ -54,9 +64,10 @@ function Navigation({
                 {active ? (
                   <S.ActivePill layoutId="role-sidebar-active" transition={transitions.layout} />
                 ) : null}
-                <Link href={item.href} ariaCurrent={active ? "page" : undefined}>
+                <Link href={item.to ?? item.href} ariaCurrent={active ? "page" : undefined}>
                   {item.icon}
                   {item.label}
+                  {item.soon ? <S.SoonTag>Pronto</S.SoonTag> : null}
                   {item.badge ? (
                     <S.NavBadge key={item.badge}>
                       <S.VisuallyHidden>, </S.VisuallyHidden>
@@ -71,7 +82,7 @@ function Navigation({
         </S.List>
       </LayoutGroup>
       <S.Profile>
-        <Avatar name={profileName} announceName={false} />
+        <Avatar name={profileName} avatarKey={avatarKey} announceName={false} />
         <span>{profileName}</span>
       </S.Profile>
     </S.Shell>
@@ -83,6 +94,7 @@ export function RoleSidebar({
   items,
   currentPath,
   profileName,
+  avatarKey = null,
   variant = "inline",
   open = false,
   onOpenChange,
@@ -100,6 +112,7 @@ export function RoleSidebar({
               items={items}
               currentPath={currentPath}
               profileName={profileName}
+              avatarKey={avatarKey}
               fill
             />
           </S.Drawer>
@@ -109,6 +122,12 @@ export function RoleSidebar({
   }
 
   return (
-    <Navigation label={label} items={items} currentPath={currentPath} profileName={profileName} />
+    <Navigation
+      label={label}
+      items={items}
+      currentPath={currentPath}
+      profileName={profileName}
+      avatarKey={avatarKey}
+    />
   );
 }

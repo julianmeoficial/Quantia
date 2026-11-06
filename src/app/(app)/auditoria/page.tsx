@@ -1,22 +1,14 @@
-import { Suspense } from "react";
-
-import { Skeleton } from "@/components/system";
-import { AuditScreen } from "@/features/audit";
+import { ComingSoonScreen } from "@/features/coming-soon";
 
 /** Client auth shell blocks an instant static shell. */
 export const instant = false;
 
 export default function AuditoriaPage() {
   return (
-    <Suspense
-      fallback={
-        <>
-          <Skeleton variant="list" rows={3} />
-          <Skeleton variant="table" />
-        </>
-      }
-    >
-      <AuditScreen />
-    </Suspense>
+    <ComingSoonScreen
+      href="/auditoria"
+      title="Auditoría"
+      summary="Trazabilidad de acciones sobre proyectos, presupuestos y usuarios."
+    />
   );
 }

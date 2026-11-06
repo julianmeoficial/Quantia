@@ -1,3 +1,5 @@
+import type { AvatarKey } from "@quantia/contracts";
+
 /** UI role names from SCREENS.md. Not a stand-in for the API contract. */
 export type AppRole = "INVESTIGADOR" | "COORDINADOR" | "ADMINISTRADOR";
 
@@ -5,11 +7,14 @@ export interface NavEntry {
   href: string;
   label: string;
   roles: readonly AppRole[];
+  /** Section without an API contract yet: listed with a «Pronto» tag and a placeholder page. */
+  soon?: boolean;
 }
 
 /**
  * Sections a person may see. An item is omitted unless one of their roles allows it.
- * Convocatorias, Auditoría, Bitácoras, Documentos and a notifications section stay out.
+ * Convocatorias and Auditoría are listed as «soon» (no API contract yet). Bitácoras, Documentos
+ * and a notifications section stay out.
  * Chat stays out until the product turns `chatEnabled` on.
  */
 export const NAV_CATALOG: readonly NavEntry[] = [
@@ -17,11 +22,13 @@ export const NAV_CATALOG: readonly NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["COORDINADOR"] },
   { href: "/institucional", label: "Institucional", roles: ["ADMINISTRADOR"] },
   { href: "/proyectos", label: "Proyectos", roles: ["COORDINADOR", "ADMINISTRADOR"] },
-  { href: "/tareas", label: "Tareas", roles: ["COORDINADOR"] },
-  { href: "/avances", label: "Avances", roles: ["COORDINADOR"] },
+  { href: "/tareas", label: "Tareas", roles: ["COORDINADOR", "ADMINISTRADOR"] },
+  { href: "/avances", label: "Avances", roles: ["COORDINADOR", "ADMINISTRADOR"] },
   { href: "/presupuesto", label: "Presupuesto", roles: ["COORDINADOR", "ADMINISTRADOR"] },
   { href: "/usuarios", label: "Usuarios", roles: ["ADMINISTRADOR"] },
   { href: "/reportes", label: "Reportes", roles: ["COORDINADOR", "ADMINISTRADOR"] },
+  { href: "/convocatorias", label: "Convocatorias", roles: ["ADMINISTRADOR"], soon: true },
+  { href: "/auditoria", label: "Auditoría", roles: ["ADMINISTRADOR"], soon: true },
 ];
 
 const ROLE_PRIORITY: readonly AppRole[] = ["ADMINISTRADOR", "COORDINADOR", "INVESTIGADOR"];
@@ -41,6 +48,8 @@ export const ROLE_LABEL: Record<AppRole, string> = {
 export interface SessionIdentity {
   displayName: string;
   roles: readonly AppRole[];
+  /** Account profile avatar (`AVATAR_01`…`05`); null until the user picks one. */
+  avatar: AvatarKey | null;
 }
 
 export function navigationFor(
@@ -78,23 +87,33 @@ export function isChatPath(pathname: string): boolean {
 
 export type RouteAccess = "allowed" | "denied" | "unknown";
 
-/** Deep-link route for ADM-02; not listed in NAV_CATALOG until the call contract exists. */
-export function isConvocatoriasPath(pathname: string): boolean {
-  const path = normalizePath(pathname);
-  return path === "/convocatorias" || path.startsWith("/convocatorias/");
+/** Sections that filter by `?projectId=` and keep the project the person was working on. */
+const PROJECT_SCOPED_HREFS: readonly string[] = [
+  "/tareas",
+  "/avances",
+  "/presupuesto",
+  "/reportes",
+];
+
+const PROJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Segment after `/proyectos/`, or null when the path is not a project workspace URL. */
+export function projectRouteId(pathname: string): string | null {
+  const match = /^\/proyectos\/([^/]+)$/.exec(normalizePath(pathname));
+  const id = match?.[1] ?? null;
+  return id && PROJECT_ID.test(id) ? id : null;
 }
 
-/** Deep-link route for ADM-03; hidden from nav until the audit contract exists. */
-export function isAuditoriaPath(pathname: string): boolean {
+/** True for pages that stay inside a project's context (its workspace and filtered sections). */
+export function isProjectContextPath(pathname: string): boolean {
   const path = normalizePath(pathname);
-  return path === "/auditoria" || path.startsWith("/auditoria/");
+  return projectRouteId(path) !== null || PROJECT_SCOPED_HREFS.includes(path);
 }
 
-/** Segment after `/convocatorias/`, or null when the path is not a call detail URL. */
-export function callRouteId(pathname: string): string | null {
-  const path = normalizePath(pathname);
-  const match = /^\/convocatorias\/([^/]+)$/.exec(path);
-  return match?.[1] ?? null;
+/** `/presupuesto` becomes `/presupuesto?projectId=…` while a project is in context. */
+export function scopedHref(href: string, projectId: string | null | undefined): string {
+  if (!projectId || !PROJECT_SCOPED_HREFS.includes(href)) return href;
+  return `${href}?projectId=${encodeURIComponent(projectId)}`;
 }
 
 export function accessFor(pathname: string, roles: readonly AppRole[]): RouteAccess {
@@ -105,9 +124,6 @@ export function accessFor(pathname: string, roles: readonly AppRole[]): RouteAcc
   }
   if (isChatPath(path)) {
     return roles.length > 0 ? "allowed" : "denied";
-  }
-  if (isConvocatoriasPath(path) || isAuditoriaPath(path)) {
-    return roles.includes("ADMINISTRADOR") ? "allowed" : "denied";
   }
   return "unknown";
 }

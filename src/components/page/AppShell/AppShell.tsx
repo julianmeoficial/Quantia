@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 
 import { IconButton } from "@/components/base";
 import { AppHeader, type AppHeaderCrumb, type AppHeaderNotice } from "@/components/page/AppHeader";
@@ -11,11 +11,12 @@ import { ErrorState } from "@/components/system";
 import type { ConnectionState } from "@/components/system";
 import {
   accessFor,
-  callRouteId,
   landing,
   navigationFor,
   primaryRole,
+  projectRouteId,
   ROLE_LABEL,
+  scopedHref,
   sectionLabel,
 } from "@/lib/auth";
 import type { SessionIdentity } from "@/lib/auth";
@@ -23,9 +24,12 @@ import type { SessionIdentity } from "@/lib/auth";
 import { MenuIcon, iconForHref } from "./nav-icons";
 
 function crumbsFor(pathname: string, home: string | null, denied: boolean): AppHeaderCrumb[] {
-  const callId = callRouteId(pathname);
-  if (callId && !denied) {
-    return [{ label: "quantia.udc", href: "/institucional" }, { label: `convocatorias/${callId}` }];
+  if (projectRouteId(pathname) && !denied) {
+    return [
+      { label: "Quantia", href: home ?? undefined },
+      { label: "Proyectos", href: "/proyectos" },
+      { label: "Detalle" },
+    ];
   }
 
   const section = sectionLabel(pathname);
@@ -35,13 +39,23 @@ function crumbsFor(pathname: string, home: string | null, denied: boolean): AppH
   ];
 }
 
-const Frame = styled.div`
+const Frame = styled.div<{ $fill: boolean }>`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   min-width: 0;
   max-width: 100%;
   background: ${({ theme }) => theme.colors.bg.canvas};
+
+  /* Full-height sections (Chat): the shell is exactly the viewport and the section stretches. */
+  ${({ $fill }) =>
+    $fill &&
+    css`
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    `}
 `;
 
 const Skip = styled.a`
@@ -71,6 +85,7 @@ const Skip = styled.a`
 const Body = styled.div`
   display: flex;
   flex: 1;
+  min-height: 0;
   align-items: stretch;
   gap: ${({ theme }) => theme.space[24]};
   min-width: 0;
@@ -78,10 +93,12 @@ const Body = styled.div`
   padding: ${({ theme }) => theme.space[16]};
 `;
 
+/* The fixed 240 px sidebar needs a desktop width: tablets (768–1279) use the drawer so the
+   content keeps its room for tables and filters. */
 const InlineNav = styled.div`
   display: none;
 
-  ${({ theme }) => theme.media.up("md")} {
+  ${({ theme }) => theme.media.up("lg")} {
     display: block;
   }
 `;
@@ -89,14 +106,21 @@ const InlineNav = styled.div`
 const MenuSlot = styled.div`
   display: flex;
 
-  ${({ theme }) => theme.media.up("md")} {
+  ${({ theme }) => theme.media.up("lg")} {
     display: none;
   }
 `;
 
-const Main = styled.main`
+const Main = styled.main<{ $fill: boolean }>`
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  ${({ $fill }) =>
+    $fill &&
+    css`
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    `}
   max-width: ${({ theme }) => theme.sizes.containerMax};
   display: flex;
   flex-direction: column;
@@ -145,6 +169,10 @@ export interface AppShellProps {
   chatEnabled?: boolean;
   /** Unread counters per nav href (e.g. `{ "/chat": 3 }`). */
   navBadges?: Readonly<Record<string, number>>;
+  /** Project the person is working in; Presupuesto, Reportes, Tareas and Avances open filtered by it. */
+  projectScopeId?: string | null;
+  /** Lock the shell to the viewport so a full-height section (Chat) scrolls only inside itself. */
+  fillViewport?: boolean;
 }
 
 export function AppShell({
@@ -162,6 +190,8 @@ export function AppShell({
   connectionPaused = false,
   chatEnabled = true,
   navBadges,
+  projectScopeId = null,
+  fillViewport = false,
 }: AppShellProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -178,6 +208,7 @@ export function AppShell({
 
   const items = navigationFor(identity.roles, { chatEnabled }).map((entry) => ({
     ...entry,
+    to: scopedHref(entry.href, projectScopeId),
     icon: iconForHref(entry.href),
     badge: navBadges?.[entry.href] ?? 0,
   }));
@@ -187,13 +218,14 @@ export function AppShell({
   const crumbs = crumbsFor(pathname, home, denied);
 
   return (
-    <Frame>
+    <Frame $fill={fillViewport}>
       <Skip href="#contenido">Saltar al contenido</Skip>
       <AppHeader
         crumbs={crumbs}
         connection={connection}
         onReconnect={onReconnect}
         userName={identity.displayName}
+        avatarKey={identity.avatar}
         roleLabel={role ? ROLE_LABEL[role] : undefined}
         onLogout={onLogout}
         notices={notices}
@@ -212,7 +244,12 @@ export function AppShell({
       />
       <Body>
         <InlineNav>
-          <RoleSidebar items={items} currentPath={pathname} profileName={identity.displayName} />
+          <RoleSidebar
+            items={items}
+            currentPath={pathname}
+            profileName={identity.displayName}
+            avatarKey={identity.avatar}
+          />
         </InlineNav>
         {menuOpen ? (
           <RoleSidebar
@@ -222,9 +259,10 @@ export function AppShell({
             items={items}
             currentPath={pathname}
             profileName={identity.displayName}
+            avatarKey={identity.avatar}
           />
         ) : null}
-        <Main id="contenido" tabIndex={-1}>
+        <Main id="contenido" tabIndex={-1} $fill={fillViewport}>
           {denied ? (
             <ErrorState
               variant="forbidden"

@@ -68,6 +68,13 @@ export const FilterActions = styled.div`
   align-items: center;
 `;
 
+export const RowActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[8]};
+`;
+
 export const StaleBanner = styled.div`
   display: flex;
   flex-wrap: wrap;

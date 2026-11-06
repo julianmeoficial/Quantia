@@ -4,13 +4,14 @@ import type { ProjectResponse, TaskResponse, UserResponse } from "@quantia/contr
 import { TaskPriority, TaskStatus } from "@quantia/contracts";
 import { useId, useState, type RefObject } from "react";
 
-import { Button, Select, TextField } from "@/components/base";
+import { Button, Select, TextArea, TextField } from "@/components/base";
+import { DatePicker } from "@/components/composite";
 import { Sheet } from "@/components/system";
 import { createProjectTask } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
-import { toApiDate } from "@/lib/format";
 
 import * as S from "../projects/CreateProjectPanel.styles";
+import { projectMemberOptions, type MemberNameMap } from "./memberLabels";
 
 export interface CreateTaskPanelProps {
   open: boolean;
@@ -19,15 +20,21 @@ export interface CreateTaskPanelProps {
   me: UserResponse;
   onSuccess?: (task: TaskResponse) => void;
   triggerRef?: RefObject<HTMLElement | null>;
+  memberNames?: MemberNameMap;
 }
 
-function memberOptions(project: ProjectResponse, me: UserResponse) {
-  const ids = Array.from(new Set([project.coordinatorId, ...project.memberIds]));
-  return ids.map((id) => ({
-    value: id,
-    label: id === me.id ? me.fullName : "Integrante del proyecto",
-  }));
-}
+const STATUS_OPTIONS = [
+  { value: TaskStatus.TODO, label: "Por hacer" },
+  { value: TaskStatus.IN_PROGRESS, label: "En curso" },
+  { value: TaskStatus.BLOCKED, label: "Bloqueada" },
+  { value: TaskStatus.DONE, label: "Hecha" },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: TaskPriority.LOW, label: "Baja" },
+  { value: TaskPriority.MEDIUM, label: "Media" },
+  { value: TaskPriority.HIGH, label: "Alta" },
+];
 
 export function CreateTaskPanel({
   open,
@@ -36,23 +43,26 @@ export function CreateTaskPanel({
   me,
   onSuccess,
   triggerRef,
+  memberNames,
 }: CreateTaskPanelProps) {
   const titleId = useId();
-  const dueId = useId();
+  const descriptionId = useId();
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [priority, setPriority] = useState<string>(TaskPriority.MEDIUM);
   const [status, setStatus] = useState<string>(TaskStatus.TODO);
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const reset = () => {
     setTitle("");
+    setDescription("");
     setAssigneeId("");
     setPriority(TaskPriority.MEDIUM);
     setStatus(TaskStatus.TODO);
-    setDueDate("");
+    setDueDate(null);
     setError(null);
     setIsSaving(false);
   };
@@ -70,16 +80,17 @@ export function CreateTaskPanel({
       document.getElementById(titleId)?.focus();
       return;
     }
+    if (trimmed.length > 300) {
+      setError("El título no puede superar 300 caracteres.");
+      document.getElementById(titleId)?.focus();
+      return;
+    }
 
-    let apiDue: string | undefined;
-    if (dueDate.trim()) {
-      const parsed = toApiDate(dueDate.trim());
-      if (!parsed) {
-        setError("Ingresa una fecha con formato DD/MM/AAAA.");
-        document.getElementById(dueId)?.focus();
-        return;
-      }
-      apiDue = parsed;
+    const trimmedDescription = description.trim();
+    if (trimmedDescription.length > 5000) {
+      setError("La descripción no puede superar 5000 caracteres.");
+      document.getElementById(descriptionId)?.focus();
+      return;
     }
 
     setIsSaving(true);
@@ -87,10 +98,11 @@ export function CreateTaskPanel({
     try {
       const task = await createProjectTask(project.id, {
         title: trimmed,
+        description: trimmedDescription || undefined,
         assigneeId: assigneeId || undefined,
         priority: priority as (typeof TaskPriority)[keyof typeof TaskPriority],
         status: status as (typeof TaskStatus)[keyof typeof TaskStatus],
-        dueDate: apiDue,
+        dueDate: dueDate || undefined,
       });
       reset();
       onOpenChange(false);
@@ -115,8 +127,28 @@ export function CreateTaskPanel({
       open={open}
       onOpenChange={handleOpenChange}
       title="Crear tarea"
-      description="Define título, responsable, prioridad y fecha. Solo gestores del proyecto pueden crear."
+      description="Define título, descripción, responsable, prioridad, estado y fecha. Solo gestores del proyecto pueden crear."
       triggerRef={triggerRef}
+      footer={
+        <>
+          <Button
+            intent="secondary"
+            type="button"
+            disabled={isSaving}
+            onClick={() => handleOpenChange(false)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            intent="primary"
+            type="button"
+            isLoading={isSaving}
+            onClick={() => void handleSubmit()}
+          >
+            Crear tarea
+          </Button>
+        </>
+      }
     >
       <S.Form
         onSubmit={(event) => {
@@ -127,57 +159,38 @@ export function CreateTaskPanel({
         <TextField
           id={titleId}
           label="Título"
+          required
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Ej.: Revisar protocolo"
+          autoComplete="off"
+        />
+        <TextArea
+          id={descriptionId}
+          label="Descripción"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          maxLength={5000}
+          rows={4}
         />
         <Select
           label="Responsable"
-          options={[{ value: "", label: "Sin asignar" }, ...memberOptions(project, me)]}
+          options={[
+            { value: "", label: "Sin asignar" },
+            ...projectMemberOptions(project, me, memberNames),
+          ]}
           value={assigneeId}
           onValueChange={setAssigneeId}
         />
         <Select
           label="Prioridad"
-          options={[
-            { value: TaskPriority.LOW, label: "Baja" },
-            { value: TaskPriority.MEDIUM, label: "Media" },
-            { value: TaskPriority.HIGH, label: "Alta" },
-          ]}
+          options={PRIORITY_OPTIONS}
           value={priority}
           onValueChange={setPriority}
         />
-        <Select
-          label="Estado"
-          options={[
-            { value: TaskStatus.TODO, label: "Pendiente" },
-            { value: TaskStatus.IN_PROGRESS, label: "En progreso" },
-            { value: TaskStatus.BLOCKED, label: "Bloqueada" },
-          ]}
-          value={status}
-          onValueChange={setStatus}
-        />
-        <TextField
-          id={dueId}
-          label="Fecha límite"
-          value={dueDate}
-          onChange={(event) => setDueDate(event.target.value)}
-          placeholder="Ej.: 15/10/2026"
-        />
+        <Select label="Estado" options={STATUS_OPTIONS} value={status} onValueChange={setStatus} />
+        <DatePicker label="Fecha límite" value={dueDate} onValueChange={setDueDate} withTime />
         {error ? <S.FormError role="alert">{error}</S.FormError> : null}
-        <S.FormActions>
-          <Button
-            intent="secondary"
-            type="button"
-            disabled={isSaving}
-            onClick={() => handleOpenChange(false)}
-          >
-            Cancelar
-          </Button>
-          <Button intent="primary" type="submit" isLoading={isSaving}>
-            Crear tarea
-          </Button>
-        </S.FormActions>
       </S.Form>
     </Sheet>
   );

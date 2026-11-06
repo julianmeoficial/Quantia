@@ -23,7 +23,7 @@ describe("AppShell", () => {
   it("hides coordinator and administrator sections from an investigator", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: null }}
         pathname="/mis-tareas"
       >
         <h1>Mis tareas</h1>
@@ -47,7 +47,7 @@ describe("AppShell", () => {
   it("hides administrator sections from a coordinator", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"] }}
+        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"], avatar: null }}
         pathname="/dashboard"
       />,
     );
@@ -60,60 +60,57 @@ describe("AppShell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("hides convocatorias and auditoría from an administrator", () => {
+  it("lists convocatorias and auditoría as «soon» for an administrator", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Marta Herrera", roles: ["ADMINISTRADOR"] }}
+        identity={{ displayName: "Marta Herrera", roles: ["ADMINISTRADOR"], avatar: null }}
         pathname="/institucional"
       />,
     );
-    expect(
-      sections().getByRole("link", { name: "Institucional", hidden: true }),
-    ).toBeInTheDocument();
-    expect(
-      sections().queryByRole("link", { name: "Convocatorias", hidden: true }),
-    ).not.toBeInTheDocument();
-    expect(
-      sections().queryByRole("link", { name: "Auditoría", hidden: true }),
-    ).not.toBeInTheDocument();
+    expect(sections().getByRole("link", { name: /Convocatorias/, hidden: true })).toHaveAttribute(
+      "href",
+      "/convocatorias",
+    );
+    expect(sections().getByRole("link", { name: /Auditoría/, hidden: true })).toHaveAttribute(
+      "href",
+      "/auditoria",
+    );
+    expect(sections().getAllByText("Pronto", { exact: false }).length).toBeGreaterThan(0);
     expect(sections().getByRole("link", { name: "Usuarios", hidden: true })).toBeInTheDocument();
   });
 
-  it("shows quantia.udc breadcrumb on convocatoria detail for an administrator", () => {
+  it("hides convocatorias and auditoría from coordinators", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Marta Herrera", roles: ["ADMINISTRADOR"] }}
-        pathname="/convocatorias/2026-01"
-      >
-        <h1>Convocatoria</h1>
-      </AppShell>,
+        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"], avatar: null }}
+        pathname="/dashboard"
+      />,
     );
-    const crumbs = within(screen.getByRole("navigation", { name: "Migas de pan" }));
-    expect(crumbs.getByRole("link", { name: "quantia.udc" })).toHaveAttribute(
-      "href",
-      "/institucional",
-    );
-    expect(crumbs.getByText("convocatorias/2026-01")).toBeInTheDocument();
+    expect(
+      sections().queryByRole("link", { name: /Convocatorias/, hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      sections().queryByRole("link", { name: /Auditoría/, hidden: true }),
+    ).not.toBeInTheDocument();
   });
 
-  it("blocks convocatoria deep links for non-administrators", () => {
+  it("blocks convocatorias for non-administrators", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"] }}
-        pathname="/convocatorias/2026-01"
+        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"], avatar: null }}
+        pathname="/convocatorias"
       >
-        <h1>Convocatoria</h1>
+        <h1>Convocatorias</h1>
       </AppShell>,
     );
     expect(screen.getByText("No tienes acceso")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Volver" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Convocatoria" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Convocatorias" })).not.toBeInTheDocument();
   });
 
   it("blocks auditoría deep links for non-administrators", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"] }}
+        identity={{ displayName: "Luis Gómez", roles: ["COORDINADOR"], avatar: null }}
         pathname="/auditoria"
       >
         <h1>Auditoría</h1>
@@ -127,7 +124,7 @@ describe("AppShell", () => {
   it("keeps the screen mounted when the session expires", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: null }}
         pathname="/mis-tareas"
         sessionExpired
       >
@@ -148,7 +145,7 @@ describe("AppShell", () => {
   it("shows a permission state for a forbidden catalog path and omits it from the nav", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: null }}
         pathname="/usuarios"
       >
         <h1>Usuarios</h1>
@@ -165,7 +162,7 @@ describe("AppShell", () => {
   it("points the skip link at the content landmark", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: null }}
         pathname="/mis-tareas"
       />,
     );
@@ -179,7 +176,7 @@ describe("AppShell", () => {
   it("surfaces ConnectionStatus in the header when the socket is down", () => {
     renderWithTheme(
       <AppShell
-        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] }}
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: null }}
         pathname="/mis-tareas"
         connection="disconnected"
         onReconnect={() => undefined}
@@ -188,5 +185,17 @@ describe("AppShell", () => {
     const banner = screen.getByRole("status");
     expect(banner).toHaveAttribute("aria-live", "polite");
     expect(banner).toHaveTextContent("Datos posiblemente desactualizados");
+  });
+
+  it("shows the account avatar in the header and sidebar profile", () => {
+    renderWithTheme(
+      <AppShell
+        identity={{ displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: "AVATAR_02" }}
+        pathname="/mis-tareas"
+      />,
+    );
+    const avatars = document.querySelectorAll('[data-avatar="AVATAR_02"]');
+    expect(avatars.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole("button", { name: /cuenta de Ana Ruiz/i })).toBeInTheDocument();
   });
 });
