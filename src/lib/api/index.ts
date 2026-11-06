@@ -33,8 +33,22 @@ export {
   listBudgetExecutions,
   updateProjectBudget,
 } from "./budget";
-export { createProjectProgress, getProjectProgress, listProjectProgress } from "./progress";
-export { createProject, deleteProject, getProject, listProjects, updateProject } from "./projects";
+export {
+  createProjectProgress,
+  deleteProjectProgress,
+  getProjectProgress,
+  listProjectProgress,
+  updateProjectProgress,
+} from "./progress";
+export {
+  addProjectMember,
+  createProject,
+  deleteProject,
+  getProject,
+  listProjects,
+  removeProjectMember,
+  updateProject,
+} from "./projects";
 export { queryKeys } from "./query-keys";
 export { createProjectReport, getProjectReport } from "./reports";
 export { retrySync } from "./sync";
@@ -48,7 +62,13 @@ export {
   onSessionExpired,
   setAccessToken,
 } from "./session";
-export { createProjectTask, getProjectTask, listProjectTasks, updateProjectTask } from "./tasks";
+export {
+  createProjectTask,
+  deleteProjectTask,
+  getProjectTask,
+  listProjectTasks,
+  updateProjectTask,
+} from "./tasks";
 export {
   createUser,
   deleteUser,

@@ -29,7 +29,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/features/auth/AuthProvider", () => ({
   useAuth: () => ({
     user: { id: "user-1", fullName: "Ana Ruiz", roles: ["INVESTIGADOR"] },
-    identity: { displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] },
+    identity: { displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: null },
     status: "authenticated",
   }),
 }));
@@ -72,6 +72,21 @@ describe("MyTasksScreen", () => {
   });
 
   it("renders KPI values and grouped task titles", () => {
+    const project = {
+      id: "p1",
+      title: "GITEMOS-02",
+      description: null,
+      objectives: null,
+      status: "ACTIVE",
+      startDate: null,
+      endDate: null,
+      coordinatorId: "coord-1",
+      createdById: "coord-1",
+      memberIds: ["user-1"],
+      syncStatus: "SYNCED",
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    };
     mockUseMyTasks = () => ({
       status: "ready",
       data: {
@@ -82,6 +97,7 @@ describe("MyTasksScreen", () => {
             id: "t1",
             projectId: "p1",
             projectTitle: "GITEMOS-02",
+            project,
             title: "Encuesta piloto",
             description: null,
             assigneeId: "user-1",
@@ -96,6 +112,7 @@ describe("MyTasksScreen", () => {
             id: "t2",
             projectId: "p1",
             projectTitle: "GITEMOS-02",
+            project,
             title: "Informe parcial",
             description: null,
             assigneeId: "user-1",

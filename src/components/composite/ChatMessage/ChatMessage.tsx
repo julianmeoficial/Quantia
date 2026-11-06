@@ -5,7 +5,7 @@ import type {
   GeneralChatMessageDto,
   GeneralChatReactionSummary,
 } from "@quantia/contracts";
-import { AnimatePresence, motion, useAnimate } from "motion/react";
+import { AnimatePresence, motion, useAnimate, useMotionValue, useTransform } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Avatar, Button, IconButton } from "@/components/base";
@@ -18,10 +18,14 @@ import {
   SmileIcon,
   TrashIcon,
 } from "@/components/base/icons";
+import { useCoarsePointer } from "@/lib/device";
 import { formatTime } from "@/lib/format";
 import { transitions } from "@/lib/motion";
 
 import * as S from "./ChatMessage.styles";
+
+/** Leftward drag (px) that triggers a reply on touch. */
+const SWIPE_REPLY_PX = 64;
 
 export type ChatDeliveryState = "sending" | "sent" | "failed";
 
@@ -190,6 +194,15 @@ export function ChatMessage({
   const canReact = persisted && Boolean(onReact) && reactionOptions.length > 0;
   const hasActions = persisted && (canReact || onReply || canEdit || canDelete);
 
+  // Touch only: drag the message left to reply. Mouse/trackpad users get the hover toolbar.
+  const coarse = useCoarsePointer();
+  const swipeToReply = coarse && persisted && Boolean(onReply);
+  const dragX = useMotionValue(0);
+  const hintOpacity = useTransform(dragX, [-SWIPE_REPLY_PX, -16, 0], [1, 0, 0]);
+  const hintScale = useTransform(dragX, [-SWIPE_REPLY_PX, 0], [1, 0.6]);
+  // The glyph is a child of the sliding row; cancel the drag so it stays pinned to the edge.
+  const hintX = useTransform(dragX, (value) => -value);
+
   function closePicker(restoreFocus: boolean) {
     setPickerOpen(false);
     if (restoreFocus) pickerTrigger.current?.focus();
@@ -202,6 +215,18 @@ export function ChatMessage({
       data-delivery={deliveryState}
       data-actions={actionsVisible || pickerOpen ? "open" : undefined}
       onPointerDown={onActivate}
+      drag={swipeToReply ? "x" : false}
+      dragDirectionLock
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={{ left: 0.35, right: 0 }}
+      dragSnapToOrigin
+      style={swipeToReply ? { x: dragX } : undefined}
+      onDragEnd={(_, info) => {
+        if (info.offset.x <= -SWIPE_REPLY_PX) {
+          if (typeof navigator !== "undefined") navigator.vibrate?.(8);
+          onReply?.();
+        }
+      }}
       onKeyDown={(event) => {
         if (event.key === "Escape" && pickerOpen) {
           event.stopPropagation();
@@ -209,6 +234,11 @@ export function ChatMessage({
         }
       }}
     >
+      {swipeToReply ? (
+        <S.SwipeHint aria-hidden style={{ opacity: hintOpacity, scale: hintScale, x: hintX }}>
+          <ReplyIcon />
+        </S.SwipeHint>
+      ) : null}
       <S.AvatarSlot aria-hidden={!showIdentity}>
         {showIdentity ? (
           <Avatar

@@ -11,9 +11,9 @@ import type { SessionIdentity } from "@/lib/auth";
 import { SectionStub } from "../(app)/section-stub";
 
 const PERSONAS = [
-  { displayName: "Ana Ruiz", roles: ["INVESTIGADOR"] },
-  { displayName: "Luis Gómez", roles: ["COORDINADOR"] },
-  { displayName: "Marta Herrera", roles: ["ADMINISTRADOR"] },
+  { displayName: "Ana Ruiz", roles: ["INVESTIGADOR"], avatar: "AVATAR_01" },
+  { displayName: "Luis Gómez", roles: ["COORDINADOR"], avatar: "AVATAR_02" },
+  { displayName: "Marta Herrera", roles: ["ADMINISTRADOR"], avatar: "AVATAR_03" },
 ] as const satisfies readonly SessionIdentity[];
 
 const Stage = styled.div`

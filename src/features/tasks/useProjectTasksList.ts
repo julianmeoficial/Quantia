@@ -58,6 +58,7 @@ export function useProjectTasksList(query: ProjectTasksListQuery | null) {
           status: query.status === ALL_STATUSES ? undefined : (query.status as TaskStatus),
           priority:
             query.priority === ALL_PRIORITIES ? undefined : (query.priority as TaskPriority),
+          assigneeId: query.assigneeId || undefined,
           sortBy: query.sortBy,
           sortOrder: query.sortOrder,
         });
@@ -79,6 +80,7 @@ export function useProjectTasksList(query: ProjectTasksListQuery | null) {
     };
   }, [
     active,
+    query?.assigneeId,
     query?.page,
     query?.pageSize,
     query?.priority,

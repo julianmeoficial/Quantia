@@ -10,11 +10,31 @@ import {
   uniqueProjects,
 } from "./myTasksFilters";
 
+function stubProject(id: string, title: string): MyTaskRow["project"] {
+  return {
+    id,
+    title,
+    description: null,
+    objectives: null,
+    status: "ACTIVE",
+    startDate: null,
+    endDate: null,
+    coordinatorId: "coord-1",
+    createdById: "coord-1",
+    memberIds: ["u1"],
+    syncStatus: "SYNCED",
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  };
+}
+
 function task(
   partial: Partial<MyTaskRow> & Pick<MyTaskRow, "id" | "projectId" | "status">,
 ): MyTaskRow {
+  const projectTitle = partial.projectTitle ?? "Proyecto";
+  const projectId = partial.projectId;
+  const { project: explicitProject, ...rest } = partial;
   return {
-    projectTitle: "Proyecto",
     title: "Tarea",
     description: null,
     assigneeId: "u1",
@@ -23,7 +43,9 @@ function task(
     syncStatus: "SYNCED",
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",
-    ...partial,
+    projectTitle,
+    ...rest,
+    project: explicitProject ?? stubProject(projectId, projectTitle),
   };
 }
 

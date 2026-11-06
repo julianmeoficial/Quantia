@@ -1,5 +1,7 @@
 export { ChatMessage } from "./ChatMessage";
 export type { ChatDeliveryState, ChatGroupPosition, ChatMessageProps } from "./ChatMessage";
+export { DatePicker } from "./DatePicker";
+export type { DatePickerProps } from "./DatePicker";
 export { DateRangePicker } from "./DateRangePicker";
 export type { DateRangePickerProps, DateRangeValue } from "./DateRangePicker";
 export { FileUploader } from "./FileUploader";
@@ -16,6 +18,8 @@ export { PresenceList } from "./PresenceList";
 export type { PresenceListProps, PresenceListRecent } from "./PresenceList";
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
+export { TaskStatusControl } from "./TaskStatusControl";
+export type { TaskStatusControlProps } from "./TaskStatusControl";
 export { ProgressBar } from "./ProgressBar";
 export type { ProgressBarProps } from "./ProgressBar";
 export { ProjectCard } from "./ProjectCard";

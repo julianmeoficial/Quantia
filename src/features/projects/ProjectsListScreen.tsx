@@ -7,7 +7,14 @@ import { useRouter } from "next/navigation";
 import { Badge, Button, Link, PROJECT_STATUS_PRESENTATION, Select } from "@/components/base";
 import { FilterBar, type FilterChip } from "@/components/composite";
 import { DataTable, type DataTableColumn } from "@/components/page";
-import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/components/system";
+import {
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  Toast,
+  ToastProvider,
+} from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
 import {
   ALL_STATUSES,
@@ -19,13 +26,16 @@ import {
   statusChipLabel,
   type ProjectListFilters,
 } from "@/features/filters";
-import { canAccess, isAdmin, isCoordinator } from "@/lib/auth";
+import { deleteProject } from "@/lib/api";
+import { ApiError } from "@/lib/api/errors";
+import { canAccess, canManageProject, isAdmin, isCoordinator } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { useUrlFilters } from "@/lib/url";
 
 import { CreateProjectPanel } from "./CreateProjectPanel";
+import { EditProjectPanel } from "./EditProjectPanel";
 import * as S from "./ProjectsListScreen.styles";
 import { useProjectsList } from "./useProjectsList";
 
@@ -40,7 +50,11 @@ function StatusCell({ status }: { status: ProjectResponse["status"] }) {
   return <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />;
 }
 
-function buildColumns(me: UserResponse | null): DataTableColumn<ProjectResponse>[] {
+function buildColumns(
+  me: UserResponse | null,
+  onEdit: (project: ProjectResponse) => void,
+  onDelete: (project: ProjectResponse) => void,
+): DataTableColumn<ProjectResponse>[] {
   return [
     {
       id: "title",
@@ -65,7 +79,21 @@ function buildColumns(me: UserResponse | null): DataTableColumn<ProjectResponse>
     {
       id: "action",
       header: "Acción",
-      cell: (row) => <Link href={`/proyectos/${row.id}`}>ver proyecto</Link>,
+      cell: (row) => (
+        <S.RowActions>
+          <Link href={`/proyectos/${row.id}`}>ver proyecto</Link>
+          {me && canManageProject(me, row) ? (
+            <>
+              <Button intent="secondary" type="button" onClick={() => onEdit(row)}>
+                Editar
+              </Button>
+              <Button intent="danger" type="button" onClick={() => onDelete(row)}>
+                Eliminar
+              </Button>
+            </>
+          ) : null}
+        </S.RowActions>
+      ),
     },
   ];
 }
@@ -118,7 +146,12 @@ function ProjectsListBody() {
   );
 
   const { status, data, error, stale, reload } = useProjectsList(query);
+  const editTriggerRef = useRef<HTMLSpanElement>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editProject, setEditProject] = useState<ProjectResponse | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectResponse | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
     title: "",
@@ -127,7 +160,41 @@ function ProjectsListBody() {
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/proyectos", roles);
   const canCreate = Boolean(user && (isAdmin(user) || isCoordinator(user)));
-  const columns = useMemo(() => buildColumns(user), [user]);
+  const columns = useMemo(
+    () =>
+      buildColumns(
+        user,
+        (project) => {
+          setEditProject(project);
+          setEditOpen(true);
+        },
+        (project) => setDeleteTarget(project),
+      ),
+    [user],
+  );
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteProject(deleteTarget.id);
+      setDeleteTarget(null);
+      setToast({ open: true, title: "Proyecto eliminado", description: deleteTarget.title });
+      reload();
+    } catch (cause: unknown) {
+      const apiError = cause instanceof ApiError ? cause : new ApiError("unknown", null);
+      setDeleteTarget(null);
+      setToast({
+        open: true,
+        title:
+          apiError.kind === "forbidden"
+            ? "No tienes permiso para eliminar este proyecto"
+            : "No pudimos eliminar el proyecto",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const sortValue = `${values.sortBy}:${values.sortOrder}`;
   const sortIsDefault =
@@ -363,6 +430,48 @@ function ProjectsListBody() {
           }}
         />
       ) : null}
+
+      {user ? (
+        <span ref={editTriggerRef}>
+          <EditProjectPanel
+            open={editOpen}
+            onOpenChange={(open) => {
+              setEditOpen(open);
+              if (!open) setEditProject(null);
+            }}
+            project={editProject}
+            me={user}
+            triggerRef={editTriggerRef}
+            onSuccess={(project) => {
+              setToast({
+                open: true,
+                title: "Proyecto actualizado",
+                description: project.title,
+              });
+              reload();
+            }}
+          />
+        </span>
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null);
+        }}
+        title="Eliminar proyecto"
+        description={
+          deleteTarget
+            ? `Se eliminará permanentemente «${deleteTarget.title}» y sus datos asociados. Esta acción no se puede deshacer.`
+            : "Se eliminará el proyecto."
+        }
+        confirmLabel="Eliminar proyecto"
+        intent="danger"
+        isLoading={isDeleting}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+      />
 
       <Toast
         open={toast.open}

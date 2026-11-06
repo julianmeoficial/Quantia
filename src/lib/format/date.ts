@@ -68,38 +68,74 @@ function parseDisplayDate(value: string): { year: number; month: number; day: nu
   return { year, month, day };
 }
 
-/** ISO UTC built from 00:00 America/Bogota for a date-only field. */
-export function toApiDate(value: string | Date | null | undefined): string | null {
-  if (value === null || value === undefined || value === "") return null;
-
-  let year: number;
-  let month: number;
-  let day: number;
-
+function bogotaYmd(value: string | Date): { year: number; month: number; day: number } | null {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
     const parts = partsInBogota(value);
-    year = Number(parts.get("year"));
-    month = Number(parts.get("month"));
-    day = Number(parts.get("day"));
+    const year = Number(parts.get("year"));
+    const month = Number(parts.get("month"));
+    const day = Number(parts.get("day"));
     if (!year || !month || !day) return null;
-  } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(value.trim())) {
-    const parsed = parseDisplayDate(value);
-    if (!parsed) return null;
-    year = parsed.year;
-    month = parsed.month;
-    day = parsed.day;
-  } else {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    const parts = partsInBogota(date);
-    year = Number(parts.get("year"));
-    month = Number(parts.get("month"));
-    day = Number(parts.get("day"));
-    if (!year || !month || !day) return null;
+    return { year, month, day };
   }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value.trim())) {
+    return parseDisplayDate(value);
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = partsInBogota(date);
+  const year = Number(parts.get("year"));
+  const month = Number(parts.get("month"));
+  const day = Number(parts.get("day"));
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
 
-  return new Date(Date.UTC(year, month - 1, day, BOGOTA_OFFSET_HOURS, 0, 0)).toISOString();
+/** ISO UTC built from 00:00 America/Bogota for a date-only field. */
+export function toApiDate(value: string | Date | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const ymd = bogotaYmd(value);
+  if (!ymd) return null;
+  return new Date(
+    Date.UTC(ymd.year, ymd.month - 1, ymd.day, BOGOTA_OFFSET_HOURS, 0, 0),
+  ).toISOString();
+}
+
+/**
+ * ISO UTC from a calendar day + clock time in America/Bogota.
+ * `time` is `HH:mm` (24h). Defaults to 00:00 when omitted.
+ */
+export function toApiDateTime(
+  datePart: string | Date | null | undefined,
+  timePart: string | null | undefined = "00:00",
+): string | null {
+  if (datePart === null || datePart === undefined || datePart === "") return null;
+  const ymd = bogotaYmd(datePart);
+  if (!ymd) return null;
+  const match = /^(\d{2}):(\d{2})$/.exec((timePart ?? "00:00").trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  // Bogota is UTC-5 year-round: local = UTC + 5h.
+  return new Date(
+    Date.UTC(ymd.year, ymd.month - 1, ymd.day, hour + BOGOTA_OFFSET_HOURS, minute, 0),
+  ).toISOString();
+}
+
+/** `HH:mm` in America/Bogota from an ISO instant (defaults to 00:00). */
+export function bogotaTimeParts(value: string | Date | null | undefined): {
+  hour: string;
+  minute: string;
+} {
+  if (!value) return { hour: "00", minute: "00" };
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return { hour: "00", minute: "00" };
+  const parts = partsInBogota(date);
+  return {
+    hour: parts.get("hour") ?? "00",
+    minute: parts.get("minute") ?? "00",
+  };
 }
 
 export function formatRange(from?: string | null, to?: string | null): string {

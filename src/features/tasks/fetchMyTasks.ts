@@ -10,6 +10,7 @@ const CONCURRENCY = 4;
 
 export type MyTaskRow = TaskResponse & {
   projectTitle: string;
+  project: ProjectResponse;
 };
 
 export type MyTasksResult = {
@@ -137,7 +138,7 @@ export async function fetchMyTasks(
       return {
         tasks: rawTasks
           .filter((task) => task.status !== "DONE")
-          .map((task) => ({ ...task, projectTitle: project.title })),
+          .map((task) => ({ ...task, projectTitle: project.title, project })),
         monthProgress,
         failed: false,
       };

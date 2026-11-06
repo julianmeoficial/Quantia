@@ -22,7 +22,9 @@ import type { AppRole } from "@/lib/auth/navigation";
 import { useUrlFilters } from "@/lib/url";
 
 import * as S from "../tasks/sectionPage.styles";
+import { evidenceLinksOf } from "./evidenceLinks";
 import { RegisterProgressPanel } from "./RegisterProgressPanel";
+import { useProgressEntryActions } from "./useProgressEntryActions";
 import { useProjectProgressList } from "./useProjectProgressList";
 
 function actorLabel(userId: string, me: UserResponse): string {
@@ -38,6 +40,9 @@ function toActivityItems(
     isRetrying: boolean;
     retryingId: string | null;
     onRetry: (entry: ProgressResponse) => void;
+    actionsFor: (
+      entry: ProgressResponse,
+    ) => { onEdit: () => void; onDelete: () => void } | undefined;
   },
 ): ActivityItem[] {
   return entries.map((entry) => {
@@ -52,13 +57,13 @@ function toActivityItems(
       at: entry.recordedAt,
       actor: actorLabel(entry.authorId, me),
       text: `${entry.title}: ${entry.description}`,
-      evidenceHref: entry.evidenceLinks[0],
-      evidenceLabel: entry.evidenceLinks[0] ? "Ver evidencia" : undefined,
+      evidence: evidenceLinksOf(entry.evidenceLinks),
       syncStatus,
       lastSyncedAt: entry.syncStatus === "SYNCED" ? entry.updatedAt : undefined,
       canRetrySync: options.canRetry && syncStatus === "failed",
       isRetryingSync: options.isRetrying && options.retryingId === entry.id,
       onRetrySync: () => options.onRetry(entry),
+      ...options.actionsFor(entry),
     };
   });
 }
@@ -112,6 +117,13 @@ function ProgressListBody() {
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
     title: "",
+  });
+
+  const entryActions = useProgressEntryActions({
+    user,
+    project: selectedProject,
+    onChanged: reload,
+    onNotice: (title, description) => setToast({ open: true, title, description }),
   });
 
   const taskOptions = useMemo(
@@ -190,6 +202,7 @@ function ProgressListBody() {
     : entries;
   const items = user
     ? toActivityItems(filtered, user, {
+        actionsFor: entryActions.forEntry,
         canRetry,
         isRetrying,
         retryingId,
@@ -363,6 +376,8 @@ function ProgressListBody() {
           }}
         />
       ) : null}
+
+      {entryActions.dialogs}
 
       <Toast
         open={toast.open}

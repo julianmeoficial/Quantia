@@ -13,6 +13,8 @@ import {
 import type { DomainBadgeStatus } from "@/components/base";
 import { formatDate } from "@/lib/format";
 
+import { TaskStatusControl } from "../TaskStatusControl";
+
 import * as S from "./TaskRow.styles";
 
 export interface TaskRowProps {
@@ -24,6 +26,8 @@ export interface TaskRowProps {
   canUpdate?: boolean;
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
+  /** Shows the status as a menu with the four states instead of a static badge. */
+  onStatusChange?: (next: TaskStatus) => void;
   highlighted?: boolean;
 }
 
@@ -40,6 +44,7 @@ export function TaskRow({
   canUpdate = false,
   checked = false,
   onCheckedChange,
+  onStatusChange,
   highlighted = false,
 }: TaskRowProps) {
   const presentation = isTaskStatus(status)
@@ -64,7 +69,11 @@ export function TaskRow({
         <S.Meta>
           <Avatar name={assignee} announceName={false} />
           <span>{assignee}</span>
-          <Badge label={presentation.label} tone={presentation.tone} icon={<StatusIcon />} />
+          {canUpdate && onStatusChange && isTaskStatus(status) ? (
+            <TaskStatusControl status={status} title={title} onChange={onStatusChange} />
+          ) : (
+            <Badge label={presentation.label} tone={presentation.tone} icon={<StatusIcon />} />
+          )}
           <time dateTime={due ?? undefined}>{formatDate(due)}</time>
         </S.Meta>
       </S.Main>

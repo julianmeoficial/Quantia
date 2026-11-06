@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { accessFor, canAccess, landing, navigationFor } from "./index";
+import {
+  accessFor,
+  canAccess,
+  isProjectContextPath,
+  landing,
+  navigationFor,
+  projectRouteId,
+  scopedHref,
+} from "./index";
 
 describe("navigation matrix", () => {
   it("lands on the highest role", () => {
@@ -15,8 +23,18 @@ describe("navigation matrix", () => {
     expect(labels).toContain("Dashboard");
     expect(labels).toContain("Institucional");
     expect(labels).toContain("Usuarios");
+    expect(labels).toContain("Tareas");
+    expect(labels).toContain("Avances");
     expect(labels).not.toContain("Mis tareas");
     expect(labels).not.toContain("Chat");
+  });
+
+  it("allows administrator operational routes shared with coordinators", () => {
+    expect(accessFor("/tareas", ["ADMINISTRADOR"])).toBe("allowed");
+    expect(accessFor("/avances", ["ADMINISTRADOR"])).toBe("allowed");
+    expect(canAccess("/tareas", ["ADMINISTRADOR"])).toBe(true);
+    expect(canAccess("/avances", ["ADMINISTRADOR"])).toBe(true);
+    expect(accessFor("/tareas", ["INVESTIGADOR"])).toBe("denied");
   });
 
   it("adds Chat when chatEnabled is on", () => {
@@ -36,20 +54,30 @@ describe("navigation matrix", () => {
     expect(canAccess("/presupuesto", ["ADMINISTRADOR"])).toBe(true);
   });
 
-  it("allows convocatoria deep links only for administrators", () => {
-    expect(accessFor("/convocatorias", ["ADMINISTRADOR"])).toBe("allowed");
-    expect(accessFor("/convocatorias/2026-01", ["ADMINISTRADOR"])).toBe("allowed");
-    expect(canAccess("/convocatorias/2026-01", ["ADMINISTRADOR"])).toBe(true);
-    expect(accessFor("/convocatorias/2026-01", ["COORDINADOR"])).toBe("denied");
-    expect(accessFor("/convocatorias/2026-01", ["INVESTIGADOR"])).toBe("denied");
-    expect(canAccess("/convocatorias/2026-01", ["INVESTIGADOR"])).toBe(false);
+  it("allows the «soon» sections only for administrators", () => {
+    for (const path of ["/convocatorias", "/auditoria"]) {
+      expect(accessFor(path, ["ADMINISTRADOR"])).toBe("allowed");
+      expect(accessFor(path, ["COORDINADOR"])).toBe("denied");
+      expect(accessFor(path, ["INVESTIGADOR"])).toBe("denied");
+      expect(canAccess(path, ["COORDINADOR"])).toBe(false);
+    }
+    const admin = navigationFor(["ADMINISTRADOR"]);
+    expect(admin.find((entry) => entry.href === "/convocatorias")?.soon).toBe(true);
+    expect(admin.find((entry) => entry.href === "/auditoria")?.soon).toBe(true);
+    expect(navigationFor(["COORDINADOR"]).some((entry) => entry.soon)).toBe(false);
   });
 
-  it("allows auditoría deep links only for administrators", () => {
-    expect(accessFor("/auditoria", ["ADMINISTRADOR"])).toBe("allowed");
-    expect(canAccess("/auditoria", ["ADMINISTRADOR"])).toBe(true);
-    expect(accessFor("/auditoria", ["COORDINADOR"])).toBe("denied");
-    expect(accessFor("/auditoria", ["INVESTIGADOR"])).toBe("denied");
-    expect(canAccess("/auditoria", ["COORDINADOR"])).toBe(false);
+  it("keeps the open project in context for budget, reports, tasks and progress", () => {
+    const id = "3f2b8c1e-4d5a-4b6c-8d7e-9a0b1c2d3e4f";
+    expect(projectRouteId(`/proyectos/${id}`)).toBe(id);
+    expect(projectRouteId("/proyectos/nuevo")).toBeNull();
+    expect(projectRouteId("/proyectos")).toBeNull();
+    expect(scopedHref("/presupuesto", id)).toBe(`/presupuesto?projectId=${id}`);
+    expect(scopedHref("/reportes", id)).toBe(`/reportes?projectId=${id}`);
+    expect(scopedHref("/usuarios", id)).toBe("/usuarios");
+    expect(scopedHref("/presupuesto", null)).toBe("/presupuesto");
+    expect(isProjectContextPath(`/proyectos/${id}`)).toBe(true);
+    expect(isProjectContextPath("/presupuesto")).toBe(true);
+    expect(isProjectContextPath("/dashboard")).toBe(false);
   });
 });

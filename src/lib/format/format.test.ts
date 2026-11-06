@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatCOP } from "./currency";
-import { formatDate, formatTime, toApiDate } from "./date";
+import { bogotaTimeParts, formatDate, formatTime, toApiDate, toApiDateTime } from "./date";
 import { compareMoney, rubricExecutionStatus, sumMoney } from "./money";
 import { formatPercent } from "./percent";
 import { formatRelativeDue } from "./relative-due";
@@ -40,6 +40,13 @@ describe("format", () => {
   it("builds an API date from DD/MM/AAAA at Bogota midnight", () => {
     expect(toApiDate("15/10/2026")).toBe("2026-10-15T05:00:00.000Z");
     expect(toApiDate("31/02/2026")).toBeNull();
+  });
+
+  it("builds an API datetime from date + Bogota clock time", () => {
+    expect(toApiDateTime("15/10/2026", "14:30")).toBe("2026-10-15T19:30:00.000Z");
+    expect(toApiDateTime("15/10/2026")).toBe("2026-10-15T05:00:00.000Z");
+    expect(toApiDateTime("15/10/2026", "25:00")).toBeNull();
+    expect(bogotaTimeParts("2026-10-15T19:30:00.000Z")).toEqual({ hour: "14", minute: "30" });
   });
 
   it("formats a percent with at most one decimal", () => {

@@ -10,7 +10,7 @@ import { EmptyState, ErrorState, Skeleton, Toast, ToastProvider } from "@/compon
 import { useAuth } from "@/features/auth/AuthProvider";
 import { BUDGET_FILTER_DEFAULTS, budgetFiltersSchema } from "@/features/filters";
 import { useAccessibleProjects } from "@/features/projects/useAccessibleProjects";
-import { canAccess, canViewBudgetDetail, isAdmin } from "@/lib/auth";
+import { canAccess, canManageBudget, canViewBudgetDetail, isAdmin } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatCOP, formatDate } from "@/lib/format";
 import { useUrlFilters } from "@/lib/url";
@@ -19,6 +19,7 @@ import { buildBudgetLines, executionsForItem } from "./buildBudgetLines";
 import { CreateBudgetPanel } from "./CreateBudgetPanel";
 import { EditBudgetPanel } from "./EditBudgetPanel";
 import { EvidenceReviewPanel } from "./EvidenceReviewPanel";
+import { RegisterExecutionPanel } from "./RegisterExecutionPanel";
 import * as S from "../tasks/sectionPage.styles";
 import { useProjectBudget } from "./useProjectBudget";
 
@@ -42,6 +43,7 @@ function BudgetBody() {
   const createTriggerRef = useRef<HTMLSpanElement>(null);
   const editTriggerRef = useRef<HTMLSpanElement>(null);
   const evidenceTriggerRef = useRef<HTMLSpanElement>(null);
+  const executionTriggerRef = useRef<HTMLSpanElement>(null);
 
   const { values, setFilters } = useUrlFilters({
     schema: budgetFiltersSchema,
@@ -61,6 +63,7 @@ function BudgetBody() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [executionOpen, setExecutionOpen] = useState(false);
   const [evidenceItemId, setEvidenceItemId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
@@ -73,6 +76,10 @@ function BudgetBody() {
   // DS-115: edición solo Administrador; Coordinador ve resumen de cartera (no canManageBudget).
   const admin = Boolean(user && isAdmin(user));
   const panelMode = admin ? "detail" : "summary";
+  // Same rule as the API: administrators and coordinators of the project register executions.
+  const canRegisterExecution = Boolean(
+    user && selectedProject && budget && canManageBudget(user, selectedProject),
+  );
 
   const lines = useMemo(
     () => (budget ? buildBudgetLines(budget, executions) : []),
@@ -172,6 +179,14 @@ function BudgetBody() {
               </Button>
             </span>
           </S.HeaderActions>
+        ) : canRegisterExecution ? (
+          <S.HeaderActions>
+            <span ref={executionTriggerRef}>
+              <Button intent="primary" type="button" onClick={() => setExecutionOpen(true)}>
+                Registrar ejecución
+              </Button>
+            </span>
+          </S.HeaderActions>
         ) : null}
       </S.Header>
 
@@ -235,7 +250,7 @@ function BudgetBody() {
             }
           />
 
-          {admin ? (
+          {admin || canRegisterExecution ? (
             <>
               <S.Title as="h2">Ejecuciones</S.Title>
               <DataTable
@@ -248,6 +263,17 @@ function BudgetBody() {
                     kind="no-records"
                     title="Sin ejecuciones"
                     description="Cuando se registren compromisos o pagos aparecerán aquí."
+                    action={
+                      canRegisterExecution ? (
+                        <Button
+                          intent="primary"
+                          type="button"
+                          onClick={() => setExecutionOpen(true)}
+                        >
+                          Registrar ejecución
+                        </Button>
+                      ) : undefined
+                    }
                   />
                 }
               />
@@ -264,6 +290,20 @@ function BudgetBody() {
           triggerRef={createTriggerRef}
           onSuccess={() => {
             setToast({ open: true, title: "Presupuesto creado" });
+            reload();
+          }}
+        />
+      ) : null}
+
+      {selectedProject && budget && canRegisterExecution ? (
+        <RegisterExecutionPanel
+          open={executionOpen}
+          onOpenChange={setExecutionOpen}
+          project={selectedProject}
+          budget={budget}
+          triggerRef={executionTriggerRef}
+          onSuccess={() => {
+            setToast({ open: true, title: "Ejecución registrada" });
             reload();
           }}
         />

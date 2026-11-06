@@ -188,7 +188,13 @@ test.describe("DS-132 responsive viewports", () => {
       });
     }
 
-    const adminRoutes = ["/usuarios", "/presupuesto", "/reportes", "/auditoria"] as const;
+    const adminRoutes = [
+      "/usuarios",
+      "/presupuesto",
+      "/reportes",
+      "/auditoria",
+      "/convocatorias",
+    ] as const;
 
     for (const route of adminRoutes) {
       test(`${route} overflow @390 y 768`, async ({ page }) => {
@@ -200,12 +206,5 @@ test.describe("DS-132 responsive viewports", () => {
         }
       });
     }
-
-    test("convocatoria shell @390", async ({ page }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto("/convocatorias/demo-call", { waitUntil: "networkidle" });
-      await expect(page.getByRole("main")).toBeVisible({ timeout: 30_000 });
-      await assertNoPageHorizontalScroll(page);
-    });
   });
 });

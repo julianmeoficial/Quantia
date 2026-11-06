@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { theme } from "@/theme";
 
+import { DatePicker } from "./DatePicker";
 import { DateRangePicker } from "./DateRangePicker";
 import { FileUploader } from "./FileUploader";
 import { Pagination } from "./Pagination";
@@ -41,6 +42,22 @@ describe("composite foundations", () => {
     fireEvent.click(screen.getByRole("button", { name: /15\/10\/2026/ }));
     expect(screen.getByRole("button", { name: "Mes anterior" })).toBeInTheDocument();
     expect(screen.getByLabelText("Desde")).toBeInTheDocument();
+  });
+
+  it("opens a single date picker calendar without typing", () => {
+    renderWithTheme(
+      <DatePicker
+        label="Fecha límite"
+        value="2026-10-15T05:00:00.000Z"
+        onValueChange={() => undefined}
+        withTime
+      />,
+    );
+    expect(screen.getByText("15/10/2026 00:00")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /15\/10\/2026/ }));
+    expect(screen.getByRole("button", { name: "Mes anterior" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mes siguiente" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Limpiar" })).toBeInTheDocument();
   });
 
   it("disables the previous page on the first page", () => {

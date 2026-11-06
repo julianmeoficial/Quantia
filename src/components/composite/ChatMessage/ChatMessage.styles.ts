@@ -7,7 +7,7 @@ import type { ChatGroupPosition } from "./ChatMessage";
 
 type Own = { $own: boolean };
 
-export const Root = styled.article<Own & { $group: ChatGroupPosition }>`
+export const Root = styled(motion.article)<Own & { $group: ChatGroupPosition }>`
   position: relative;
   display: flex;
   flex-direction: ${({ $own }) => ($own ? "row-reverse" : "row")};
@@ -174,12 +174,26 @@ export const Delivery = styled.span<{ $seen: boolean }>`
     ${({ theme }) => theme.motion.easing.standard};
 `;
 
+/**
+ * Message actions float over the bubble's top corner instead of sitting beside it, so they
+ * never steal width on narrow screens. Mouse/trackpad: revealed by hover or keyboard focus.
+ * Touch: revealed by tapping the message (`data-actions="open"`); hover never sticks.
+ */
 export const Toolbar = styled.div<Own>`
+  position: absolute;
+  top: 0;
+  ${({ $own }) => ($own ? "right" : "left")}: ${({ theme }) => theme.space[8]};
+  z-index: ${({ theme }) => theme.zIndices.sticky};
   display: flex;
-  flex: none;
   align-items: center;
+  padding: ${({ theme }) => theme.space[4]};
+  border: ${({ theme }) => theme.borderWidths.thin} solid
+    ${({ theme }) => theme.colors.border.subtle};
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ theme }) => theme.colors.bg.surface};
+  box-shadow: ${({ theme }) => theme.elevation.sm};
   opacity: 0;
-  transform: translateX(${({ $own }) => ($own ? "0.25rem" : "-0.25rem")});
+  transform: translateY(-40%) scale(0.96);
   pointer-events: none;
   transition:
     opacity ${({ theme }) => theme.motion.duration.fast}
@@ -187,17 +201,41 @@ export const Toolbar = styled.div<Own>`
     transform ${({ theme }) => theme.motion.duration.fast}
       ${({ theme }) => theme.motion.easing.standard};
 
-  ${Root}:hover &,
   ${Root}:focus-within &,
   ${Root}[data-actions="open"] & {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(-50%) scale(1);
     pointer-events: auto;
   }
 
-  ${({ theme }) => theme.media.reducedMotion} {
-    transform: none;
+  @media (hover: hover) {
+    ${Root}:hover & {
+      opacity: 1;
+      transform: translateY(-50%) scale(1);
+      pointer-events: auto;
+    }
   }
+
+  ${({ theme }) => theme.media.reducedMotion} {
+    transform: translateY(-50%);
+  }
+`;
+
+/** Reply glyph revealed behind the message while swiping on touch. */
+export const SwipeHint = styled(motion.span)`
+  position: absolute;
+  top: 50%;
+  right: ${({ theme }) => theme.space[8]};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: ${({ theme }) => theme.space[32]};
+  height: ${({ theme }) => theme.space[32]};
+  margin-top: -${({ theme }) => theme.space[16]};
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ theme }) => theme.colors.selection.bg};
+  color: ${({ theme }) => theme.colors.brand.primary};
+  pointer-events: none;
 `;
 
 export const Tray = styled(motion.div)<Own>`

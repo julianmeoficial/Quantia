@@ -23,7 +23,12 @@ import {
   Tabs,
 } from "@/components/base";
 import { FileUploader, TaskRow, type UploadItem } from "@/components/composite";
-import { ActivityTimeline, DataTable, type DataTableColumn } from "@/components/page";
+import {
+  ActivityTimeline,
+  DataTable,
+  type ActivityItem,
+  type DataTableColumn,
+} from "@/components/page";
 import type { SyncStatusValue } from "@/components/system";
 import {
   EmptyState,
@@ -35,7 +40,12 @@ import {
 } from "@/components/system";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { RegisterProgressPanel } from "@/features/progress";
+import { evidenceLinksOf } from "@/features/progress/evidenceLinks";
+import { useProgressEntryActions } from "@/features/progress/useProgressEntryActions";
 import { useRetrySync } from "@/features/sync";
+import { CreateTaskPanel } from "@/features/tasks/CreateTaskPanel";
+import { EditTaskPanel } from "@/features/tasks/EditTaskPanel";
+import { memberLabel } from "@/features/tasks/memberLabels";
 import {
   DOCUMENT_ACCEPT,
   DOCUMENT_MAX_BYTES,
@@ -50,15 +60,17 @@ import { ApiError } from "@/lib/api/errors";
 import { useRateLimitLock } from "@/lib/async/useRateLimitLock";
 import {
   canCreateProgress,
+  canCreateTask,
   canDeleteDocument,
   canEditTask,
+  canManageProject,
   canViewBudgetDetail,
   landing,
 } from "@/lib/auth";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useFrozenListOrder, useProjectSocket } from "@/lib/socket";
 
-import { EditTaskPanel } from "./EditTaskPanel";
+import { EditProjectPanel } from "./EditProjectPanel";
 import * as S from "./ProjectWorkspaceScreen.styles";
 import { buildRiskComparison, pickPriorityTask, progressFromTasks } from "./projectRisk";
 import { useProjectWorkspace } from "./useProjectWorkspace";
@@ -71,9 +83,7 @@ function mapSync(status: "PENDING" | "SYNCED" | "FAILED"): SyncStatusValue {
 }
 
 function actorLabel(userId: string | null, me: UserResponse): string {
-  if (!userId) return "Sin asignar";
-  if (userId === me.id) return me.fullName;
-  return "Integrante del proyecto";
+  return memberLabel(userId, me);
 }
 
 function formatFileSize(bytes: number): string {
@@ -157,8 +167,13 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const [registerOpen, setRegisterOpen] = useState(false);
   const registerTriggerRef = useRef<HTMLButtonElement>(null);
   const manageTaskTriggerRef = useRef<HTMLButtonElement>(null);
+  const createTaskTriggerRef = useRef<HTMLButtonElement>(null);
+  const editProjectTriggerRef = useRef<HTMLButtonElement>(null);
   const [editTaskOpen, setEditTaskOpen] = useState(false);
-  const [editFocus, setEditFocus] = useState<"assignee" | "dueDate">("dueDate");
+  const [editTask, setEditTask] = useState<TaskResponse | null>(null);
+  const [editFocus, setEditFocus] = useState<"title" | "assignee" | "dueDate">("title");
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [budget, setBudget] = useState<BudgetResponse | null>(null);
   const [budgetStatus, setBudgetStatus] = useState<"idle" | "loading" | "ready" | "missing">(
     "idle",
@@ -181,6 +196,13 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
 
   const homeHref = landing(user?.roles ?? []) ?? "/mis-tareas";
   const project = boot.status === "ready" ? boot.project : null;
+
+  const progressActions = useProgressEntryActions({
+    user,
+    project,
+    onChanged: reloadProgress,
+    onNotice: (title, description) => setToast({ open: true, title, description, tone: "success" }),
+  });
   const { highlightedTaskId, pendingProgressCount, clearPendingProgress, projectDelayedAlert } =
     useProjectSocket(projectId, project);
 
@@ -195,6 +217,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
   const frozenTasks = useFrozenListOrder(tasks.data);
   const allowProgress = user && project ? canCreateProgress(user, project) : false;
   const allowDeleteDoc = user && project ? canDeleteDocument(user, project) : false;
+  const allowCreateTask = Boolean(user && project && canCreateTask(user, project));
+  const allowManageProject = Boolean(user && project && canManageProject(user, project));
   const allowBudget = Boolean(user && canViewBudgetDetail(user));
 
   useEffect(() => {
@@ -242,11 +266,10 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     [budget, budgetStatus, progressPercent],
   );
 
-  const onToggleTask = useCallback(
-    async (task: TaskResponse, checked: boolean) => {
+  const onChangeTaskStatus = useCallback(
+    async (task: TaskResponse, nextStatus: TaskStatus) => {
       if (!user || !project || !canEditTask(user, project, task)) return;
       const previous = task;
-      const nextStatus: TaskStatus = checked ? "DONE" : "TODO";
       const optimistic: TaskResponse = {
         ...task,
         status: nextStatus,
@@ -449,15 +472,16 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
 
   const timelineItems =
     progress.data?.map((entry) => {
-      const evidence = entry.evidenceLinks.find((link) => /^https?:\/\//i.test(link));
+      const entryActions = progressActions.forEntry(entry);
+      const evidence = evidenceLinksOf(entry.evidenceLinks);
       const entrySync = mapSync(entry.syncStatus);
       return {
         id: entry.id,
         at: entry.recordedAt,
         actor: actorLabel(entry.authorId, user),
         text: entry.title,
-        evidenceHref: evidence,
-        evidenceLabel: evidence ? "Ver evidencia" : undefined,
+        evidence,
+        ...entryActions,
         syncStatus: entrySync,
         lastSyncedAt: entry.syncStatus === "SYNCED" ? entry.updatedAt : undefined,
         canRetrySync: canRetry && entrySync === "failed",
@@ -484,6 +508,33 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
       };
     }) ?? [];
 
+  const canManagePriority = Boolean(
+    user && project && priorityTask && canEditTask(user, project, priorityTask),
+  );
+
+  const openEditTask = (task: TaskResponse | null, focus: "title" | "assignee" | "dueDate") => {
+    const target = task ?? priorityTask;
+    if (!target) {
+      setToast({
+        open: true,
+        title: "No hay tarea para editar",
+        description: "Cuando exista una tarea podrás gestionarla aquí.",
+      });
+      return;
+    }
+    if (!user || !project || !canEditTask(user, project, target)) {
+      setToast({
+        open: true,
+        title: "No puedes editar esta tarea",
+        description: "Solo el responsable o quien coordina el proyecto pueden cambiarla.",
+      });
+      return;
+    }
+    setEditTask(target);
+    setEditFocus(focus);
+    setEditTaskOpen(true);
+  };
+
   const tabItems = [
     {
       value: "tareas" satisfies WorkspaceTab,
@@ -499,8 +550,12 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           pendingReorder={frozenTasks.hasPendingReorder}
           pendingCount={frozenTasks.pendingCount}
           onApplyOrder={frozenTasks.applyPendingOrder}
-          onToggle={onToggleTask}
+          onToggle={(task, checked) => void onChangeTaskStatus(task, checked ? "DONE" : "TODO")}
+          onStatus={(task, next) => void onChangeTaskStatus(task, next)}
           onRetry={reloadTasks}
+          canCreate={allowCreateTask}
+          onCreate={() => setCreateTaskOpen(true)}
+          onEdit={(task) => openEditTask(task, "title")}
         />
       ),
     },
@@ -540,31 +595,6 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     (tab === "documentos" && documents.error?.kind === "rate_limited" && documents.error) ||
     null;
 
-  const canManagePriority = Boolean(
-    user && project && priorityTask && canEditTask(user, project, priorityTask),
-  );
-
-  const openEditTask = (focus: "assignee" | "dueDate") => {
-    if (!priorityTask) {
-      setToast({
-        open: true,
-        title: "No hay tarea prioritaria",
-        description: "Cuando exista una tarea pendiente podrás gestionarla aquí.",
-      });
-      return;
-    }
-    if (!canManagePriority) {
-      setToast({
-        open: true,
-        title: "No puedes editar esta tarea",
-        description: "Solo el responsable o quien coordina el proyecto pueden cambiarla.",
-      });
-      return;
-    }
-    setEditFocus(focus);
-    setEditTaskOpen(true);
-  };
-
   const priorityColumns: DataTableColumn<TaskResponse>[] = [
     {
       id: "title",
@@ -593,11 +623,14 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
     {
       id: "action",
       header: "Acción",
-      cell: () => (
-        <Button intent="secondary" type="button" onClick={() => openEditTask("dueDate")}>
-          Editar tarea
-        </Button>
-      ),
+      cell: (row) =>
+        canManagePriority ? (
+          <Button intent="secondary" type="button" onClick={() => openEditTask(row, "dueDate")}>
+            Editar tarea
+          </Button>
+        ) : (
+          "—"
+        ),
     },
   ];
 
@@ -622,14 +655,36 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           </S.MetaRow>
         </S.HeaderText>
         <S.HeaderActions>
-          <Button
-            ref={manageTaskTriggerRef}
-            intent="primary"
-            type="button"
-            onClick={() => openEditTask("assignee")}
-          >
-            Gestionar tarea
-          </Button>
+          {allowCreateTask ? (
+            <Button
+              ref={createTaskTriggerRef}
+              intent="primary"
+              type="button"
+              onClick={() => setCreateTaskOpen(true)}
+            >
+              Crear tarea
+            </Button>
+          ) : null}
+          {allowManageProject ? (
+            <Button
+              ref={editProjectTriggerRef}
+              intent="secondary"
+              type="button"
+              onClick={() => setEditProjectOpen(true)}
+            >
+              Editar proyecto
+            </Button>
+          ) : null}
+          {canManagePriority ? (
+            <Button
+              ref={manageTaskTriggerRef}
+              intent="secondary"
+              type="button"
+              onClick={() => openEditTask(priorityTask, "assignee")}
+            >
+              Gestionar tarea
+            </Button>
+          ) : null}
           <Button
             ref={registerTriggerRef}
             intent="secondary"
@@ -709,7 +764,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
               intent="secondary"
               type="button"
               disabled={!priorityTask}
-              onClick={() => openEditTask("assignee")}
+              onClick={() => openEditTask(priorityTask, "assignee")}
             >
               Reasignar
             </Button>
@@ -717,7 +772,7 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
               intent="secondary"
               type="button"
               disabled={!priorityTask}
-              onClick={() => openEditTask("dueDate")}
+              onClick={() => openEditTask(priorityTask, "dueDate")}
             >
               Cambiar fecha
             </Button>
@@ -725,15 +780,6 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
           </S.DecisionActions>
         </S.RiskCard>
       </S.RiskGrid>
-
-      <S.PrioritySection aria-labelledby="project-comments-heading">
-        <S.PriorityTitle id="project-comments-heading">Comentarios</S.PriorityTitle>
-        <EmptyState
-          kind="no-records"
-          title="Comentarios no disponibles"
-          description="Esta función estará disponible cuando el contrato de la API lo permita. Las menciones tampoco están expuestas aún."
-        />
-      </S.PrioritySection>
 
       {priorityTask ? (
         <S.PrioritySection aria-labelledby="priority-task-heading">
@@ -805,6 +851,8 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
 
       <Tabs label="Secciones del proyecto" value={tab} onValueChange={setTab} items={tabItems} />
 
+      {progressActions.dialogs}
+
       <RegisterProgressPanel
         open={registerOpen}
         onOpenChange={setRegisterOpen}
@@ -823,11 +871,32 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
         }}
       />
 
+      <CreateTaskPanel
+        open={createTaskOpen}
+        onOpenChange={setCreateTaskOpen}
+        project={project}
+        me={user}
+        triggerRef={createTaskTriggerRef}
+        onSuccess={(created) => {
+          setLocalHighlightId(created.id);
+          setToast({
+            open: true,
+            title: "Tarea creada",
+            description: created.title,
+            tone: "success",
+          });
+          reloadTasks();
+        }}
+      />
+
       <EditTaskPanel
         open={editTaskOpen}
-        onOpenChange={setEditTaskOpen}
+        onOpenChange={(open) => {
+          setEditTaskOpen(open);
+          if (!open) setEditTask(null);
+        }}
         project={project}
-        task={priorityTask}
+        task={editTask}
         me={user}
         focusField={editFocus}
         triggerRef={manageTaskTriggerRef}
@@ -838,6 +907,31 @@ function ProjectWorkspaceBody({ projectId }: ProjectWorkspaceScreenProps) {
             open: true,
             title: "Tarea actualizada",
             description: updated.title,
+            tone: "success",
+          });
+        }}
+        onDeleted={(taskId) => {
+          setTaskList((list) => list.filter((item) => item.id !== taskId));
+          setToast({
+            open: true,
+            title: "Tarea eliminada",
+            tone: "success",
+          });
+          reloadTasks();
+        }}
+      />
+
+      <EditProjectPanel
+        open={editProjectOpen}
+        onOpenChange={setEditProjectOpen}
+        project={project}
+        me={user}
+        triggerRef={editProjectTriggerRef}
+        onSuccess={() => {
+          reloadProject();
+          setToast({
+            open: true,
+            title: "Proyecto actualizado",
             tone: "success",
           });
         }}
@@ -865,7 +959,11 @@ function TasksPanel({
   pendingCount,
   onApplyOrder,
   onToggle,
+  onStatus,
   onRetry,
+  canCreate,
+  onCreate,
+  onEdit,
 }: {
   panel: { status: string; data: TaskResponse[] | null; error: ApiError | null };
   tasks: TaskResponse[];
@@ -877,7 +975,11 @@ function TasksPanel({
   pendingCount: number;
   onApplyOrder: () => void;
   onToggle: (task: TaskResponse, checked: boolean) => void;
+  onStatus: (task: TaskResponse, next: TaskStatus) => void;
   onRetry: () => void;
+  canCreate: boolean;
+  onCreate: () => void;
+  onEdit: (task: TaskResponse) => void;
 }) {
   if (panel.status === "loading" && !panel.data) {
     return <Skeleton variant="list" rows={5} />;
@@ -899,7 +1001,18 @@ function TasksPanel({
       <EmptyState
         kind="no-records"
         title="Aún no hay tareas en este proyecto"
-        description="Cuando se asignen tareas, aparecerán aquí ordenadas por fecha límite."
+        description={
+          canCreate
+            ? "Crea la primera tarea para asignar trabajo al equipo."
+            : "Cuando se asignen tareas, aparecerán aquí ordenadas por fecha límite."
+        }
+        action={
+          canCreate ? (
+            <Button intent="primary" type="button" onClick={onCreate}>
+              Crear tarea
+            </Button>
+          ) : undefined
+        }
       />
     );
   }
@@ -930,8 +1043,14 @@ function TasksPanel({
               canUpdate={canEditTask(user, project, task)}
               checked={task.status === "DONE"}
               onCheckedChange={(checked) => onToggle(task, checked)}
+              onStatusChange={(next) => onStatus(task, next)}
               highlighted={highlightedId === task.id}
             />
+            {canEditTask(user, project, task) ? (
+              <Button intent="secondary" type="button" onClick={() => onEdit(task)}>
+                Editar
+              </Button>
+            ) : null}
           </S.TaskListItem>
         ))}
       </S.TaskList>
@@ -948,15 +1067,7 @@ function BitacoraPanel({
   canCreate,
 }: {
   panel: { status: string; data: ProgressResponse[] | null; error: ApiError | null };
-  items: Array<{
-    id: string;
-    at: string;
-    actor: string;
-    text: string;
-    evidenceHref?: string;
-    evidenceLabel?: string;
-    syncStatus?: SyncStatusValue;
-  }>;
+  items: ActivityItem[];
   pendingNewCount: number;
   onApplyNew: () => void;
   onRetry: () => void;

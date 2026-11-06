@@ -537,7 +537,8 @@ The DS requires these, but they are not in `@quantia/contracts` v0.8.0. Do not r
 | «Mis tareas» across projects | cross-project "my tasks" endpoint | `GET /projects` + `GET /projects/:id/tasks?assigneeId=me.id` per project, max 4 concurrent, `pageSize` 50 |
 | Sync retry schemas + `sync.failed` | Formal POST response / event | Provisional admin `POST /sync/:entityType/:id/retry` (DS-120); UI from REST `syncStatus`; no socket |
 | `reporte.completado` | event | polling (§5 / DS-121); when added, it can stop polling and fire the `Toast` |
-| Audit, convocatorias, institutional reports | endpoints | do not render the modules |
+| Audit, convocatorias, institutional reports | endpoints | render only the «Próximamente» placeholder (`ComingSoonScreen`): no data, no fixtures, no controls |
+| Comments, mentions, institutional deviation comparison | endpoints | do not render these sections at all |
 | Comments on progress (Coordinador) | endpoint | read-only progress |
 | Event fields `dueDate`, `summary`, `reason`, `severity`, `progressPercent` | payload fields | refetch the resource |
 

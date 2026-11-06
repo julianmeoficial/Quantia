@@ -1,14 +1,20 @@
 "use client";
 
 import type { ProjectResponse } from "@quantia/contracts";
+import { ProjectStatus } from "@quantia/contracts";
 import { useId, useState, type RefObject } from "react";
 
-import { Button, TextField } from "@/components/base";
+import { Button, Select, TextArea, TextField } from "@/components/base";
+import { DatePicker } from "@/components/composite";
 import { Sheet } from "@/components/system";
+import { useAuth } from "@/features/auth/AuthProvider";
 import { createProject } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
+import { isAdmin } from "@/lib/auth";
 
+import { CoordinatorPicker } from "./CoordinatorPicker";
 import * as S from "./CreateProjectPanel.styles";
+import { useCoordinators } from "./useCoordinators";
 
 export interface CreateProjectPanelProps {
   open: boolean;
@@ -19,8 +25,17 @@ export interface CreateProjectPanelProps {
 
 type FieldErrors = {
   title?: string;
+  coordinator?: string;
   form?: string;
 };
+
+const STATUS_OPTIONS = [
+  { value: ProjectStatus.FORMULATION, label: "En formulación" },
+  { value: ProjectStatus.ACTIVE, label: "En curso" },
+  { value: ProjectStatus.DELAYED, label: "Retrasado" },
+  { value: ProjectStatus.COMPLETED, label: "Completado" },
+  { value: ProjectStatus.CANCELLED, label: "Cancelado" },
+];
 
 export function CreateProjectPanel({
   open,
@@ -30,14 +45,29 @@ export function CreateProjectPanel({
 }: CreateProjectPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const objectivesId = useId();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [objectives, setObjectives] = useState("");
+  const [status, setStatus] = useState<string>(ProjectStatus.FORMULATION);
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const { user } = useAuth();
+  // Only administrators assign the responsible coordinator; a coordinator is always their own.
+  const mustPickCoordinator = Boolean(user && isAdmin(user));
+  const coordinatorsState = useCoordinators(open && mustPickCoordinator);
+  const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSaving, setIsSaving] = useState(false);
 
   const reset = () => {
     setTitle("");
     setDescription("");
+    setObjectives("");
+    setStatus(ProjectStatus.FORMULATION);
+    setStartDate(null);
+    setEndDate(null);
+    setCoordinatorId(null);
     setErrors({});
     setIsSaving(false);
   };
@@ -53,9 +83,14 @@ export function CreateProjectPanel({
     const trimmed = title.trim();
     if (!trimmed) nextErrors.title = "Ingresa el título del proyecto.";
     if (trimmed.length > 300) nextErrors.title = "El título no puede superar 300 caracteres.";
+
+    if (mustPickCoordinator && !coordinatorId) {
+      nextErrors.coordinator = "Elige la persona coordinadora responsable del proyecto.";
+    }
+
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
-      document.getElementById(titleId)?.focus();
+      if (nextErrors.title) document.getElementById(titleId)?.focus();
       return;
     }
 
@@ -65,6 +100,11 @@ export function CreateProjectPanel({
       const project = await createProject({
         title: trimmed,
         description: description.trim() || undefined,
+        objectives: objectives.trim() || undefined,
+        status: status as (typeof ProjectStatus)[keyof typeof ProjectStatus],
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        ...(mustPickCoordinator && coordinatorId ? { coordinatorId } : {}),
       });
       reset();
       onOpenChange(false);
@@ -91,7 +131,7 @@ export function CreateProjectPanel({
       open={open}
       onOpenChange={handleOpenChange}
       title="Crear proyecto"
-      description="Define el título y una descripción breve. Podrás completar el resto en el detalle."
+      description="Define los datos iniciales. Podrás añadir integrantes al editar el proyecto."
       triggerRef={triggerRef}
       footer={
         <>
@@ -129,13 +169,46 @@ export function CreateProjectPanel({
           error={errors.title}
           autoComplete="off"
         />
-        <TextField
+        <TextArea
           id={descriptionId}
           label="Descripción"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          autoComplete="off"
+          maxLength={5000}
+          rows={3}
         />
+        <TextArea
+          id={objectivesId}
+          label="Objetivos"
+          value={objectives}
+          onChange={(event) => setObjectives(event.target.value)}
+          maxLength={5000}
+          rows={3}
+        />
+        {mustPickCoordinator ? (
+          <CoordinatorPicker
+            label="Responsable del proyecto"
+            required
+            coordinators={coordinatorsState.coordinators}
+            status={coordinatorsState.status}
+            value={coordinatorId}
+            onValueChange={(entry) => {
+              setCoordinatorId(entry.id);
+              setErrors((prev) => ({ ...prev, coordinator: undefined }));
+            }}
+            onRetry={coordinatorsState.reload}
+            error={errors.coordinator}
+            disabled={isSaving}
+          />
+        ) : null}
+        <Select label="Estado" options={STATUS_OPTIONS} value={status} onValueChange={setStatus} />
+        <DatePicker
+          label="Fecha de inicio"
+          value={startDate}
+          onValueChange={setStartDate}
+          withTime
+        />
+        <DatePicker label="Fecha límite" value={endDate} onValueChange={setEndDate} withTime />
         {errors.form ? <S.FormError role="alert">{errors.form}</S.FormError> : null}
       </S.Form>
     </Sheet>

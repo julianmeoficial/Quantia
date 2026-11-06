@@ -1,11 +1,11 @@
 "use client";
 
-import { SyncEntityType } from "@quantia/contracts";
+import { SyncEntityType, type TaskStatus } from "@quantia/contracts";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { Badge, Button, Select, TASK_STATUS_PRESENTATION, Tooltip } from "@/components/base";
-import { TaskRow } from "@/components/composite";
+import { TaskRow, TaskStatusControl } from "@/components/composite";
 import { DataTable, KpiPanel, type DataTableColumn, type KpiMetric } from "@/components/page";
 import {
   EmptyState,
@@ -18,11 +18,13 @@ import {
 import { useAuth } from "@/features/auth/AuthProvider";
 import { RegisterProgressPanel } from "@/features/progress";
 import { useRetrySync } from "@/features/sync";
-import { errorStatePropsFromApiError } from "@/lib/api";
-import { canAccess } from "@/lib/auth";
+import { errorStatePropsFromApiError, updateProjectTask } from "@/lib/api";
+import { ApiError } from "@/lib/api/errors";
+import { canAccess, canEditTask } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
 import { formatDate, formatRelativeDue } from "@/lib/format";
 
+import { EditTaskPanel } from "./EditTaskPanel";
 import type { MyTaskRow } from "./fetchMyTasks";
 import * as S from "./MyTasksScreen.styles";
 import {
@@ -58,34 +60,52 @@ function DueCell({ dueDate }: { dueDate: string | null }) {
   );
 }
 
-function StatusCell({ status }: { status: MyTaskRow["status"] }) {
-  const presentation = TASK_STATUS_PRESENTATION[status];
-  const Icon = presentation.icon;
-  return <Badge label={presentation.label} tone={presentation.tone} icon={<Icon />} />;
+function buildColumns(
+  onEdit: (row: MyTaskRow) => void,
+  canEdit: (row: MyTaskRow) => boolean,
+  onStatus: (row: MyTaskRow, next: TaskStatus) => void,
+): DataTableColumn<MyTaskRow>[] {
+  return [
+    {
+      id: "title",
+      header: "Tarea",
+      cell: (row) => row.title,
+    },
+    {
+      id: "project",
+      header: "Proyecto",
+      cell: (row) => row.projectTitle,
+    },
+    {
+      id: "due",
+      header: "Vence",
+      cell: (row) => <DueCell dueDate={row.dueDate} />,
+    },
+    {
+      id: "status",
+      header: "Estado",
+      cell: (row) => (
+        <TaskStatusControl
+          status={row.status}
+          title={row.title}
+          onChange={canEdit(row) ? (next) => onStatus(row, next) : undefined}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "Acción",
+      cell: (row) =>
+        canEdit(row) ? (
+          <Button intent="secondary" type="button" onClick={() => onEdit(row)}>
+            Editar
+          </Button>
+        ) : (
+          "—"
+        ),
+    },
+  ];
 }
-
-const COLUMNS: DataTableColumn<MyTaskRow>[] = [
-  {
-    id: "title",
-    header: "Tarea",
-    cell: (row) => row.title,
-  },
-  {
-    id: "project",
-    header: "Proyecto",
-    cell: (row) => row.projectTitle,
-  },
-  {
-    id: "due",
-    header: "Vence",
-    cell: (row) => <DueCell dueDate={row.dueDate} />,
-  },
-  {
-    id: "status",
-    header: "Estado",
-    cell: (row) => <StatusCell status={row.status} />,
-  },
-];
 
 function buildMetrics(
   overdue: number,
@@ -125,7 +145,15 @@ const STATUS_FILTER_OPTIONS = [
   { value: "BLOCKED", label: TASK_STATUS_PRESENTATION.BLOCKED.label },
 ];
 
-function UrgencyDesktop({ bucket, rows }: { bucket: UrgencyBucket; rows: MyTaskRow[] }) {
+function UrgencyDesktop({
+  bucket,
+  rows,
+  columns,
+}: {
+  bucket: UrgencyBucket;
+  rows: MyTaskRow[];
+  columns: DataTableColumn<MyTaskRow>[];
+}) {
   if (rows.length === 0) return null;
   return (
     <S.Section aria-labelledby={`urgency-${bucket}`}>
@@ -140,7 +168,7 @@ function UrgencyDesktop({ bucket, rows }: { bucket: UrgencyBucket; rows: MyTaskR
       </S.SectionHeading>
       <DataTable
         caption={`${URGENCY_LABEL[bucket]} — mis tareas`}
-        columns={COLUMNS}
+        columns={columns}
         rows={rows}
         getRowId={(row) => row.id}
       />
@@ -152,10 +180,18 @@ function UrgencyMobile({
   bucket,
   rows,
   onRegister,
+  onEdit,
+  canEdit,
+  onToggle,
+  onStatus,
 }: {
   bucket: UrgencyBucket;
   rows: MyTaskRow[];
   onRegister: (task: MyTaskRow) => void;
+  onEdit: (task: MyTaskRow) => void;
+  canEdit: (task: MyTaskRow) => boolean;
+  onToggle: (task: MyTaskRow, checked: boolean) => void;
+  onStatus: (task: MyTaskRow, next: TaskStatus) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -178,8 +214,22 @@ function UrgencyMobile({
               assignee={row.projectTitle}
               status={row.status}
               due={row.dueDate}
+              canUpdate={canEdit(row)}
+              checked={row.status === "DONE"}
+              onCheckedChange={(checked) => onToggle(row, checked)}
+              onStatusChange={(next) => onStatus(row, next)}
             />
             <S.MobileTaskActions>
+              {canEdit(row) ? (
+                <Button
+                  intent="secondary"
+                  type="button"
+                  onClick={() => onEdit(row)}
+                  aria-label={`Editar ${row.title}`}
+                >
+                  Editar
+                </Button>
+              ) : null}
               <Button
                 intent="secondary"
                 type="button"
@@ -257,16 +307,48 @@ export function MyTasksScreen() {
 function MyTasksBody() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { identity } = useAuth();
+  const { identity, user } = useAuth();
   const { status, data, error, reload } = useMyTasks();
   const { canRetry, isRetrying, retry } = useRetrySync();
   const [registerOpen, setRegisterOpen] = useState(false);
   const [registerTaskId, setRegisterTaskId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editRow, setEditRow] = useState<MyTaskRow | null>(null);
   const [toast, setToast] = useState<{ open: boolean; title: string; description?: string }>({
     open: false,
     title: "",
   });
   const registerTriggerRef = useRef<HTMLButtonElement>(null);
+  const editTriggerRef = useRef<HTMLSpanElement>(null);
+
+  const canEditRow = useMemo(
+    () => (row: MyTaskRow) => Boolean(user && canEditTask(user, row.project, row)),
+    [user],
+  );
+
+  const openEdit = (row: MyTaskRow) => {
+    setEditRow(row);
+    setEditOpen(true);
+  };
+
+  const onChangeStatus = async (row: MyTaskRow, next: TaskStatus) => {
+    if (!canEditRow(row)) return;
+    try {
+      await updateProjectTask(row.projectId, row.id, { status: next });
+      reload();
+    } catch (cause: unknown) {
+      const apiError = cause instanceof ApiError ? cause : new ApiError("unknown", null);
+      setToast({
+        open: true,
+        title:
+          apiError.kind === "forbidden"
+            ? "No tienes permiso para actualizar esta tarea"
+            : "No se pudo actualizar la tarea",
+      });
+    }
+  };
+
+  const columns = buildColumns(openEdit, canEditRow, (row, next) => void onChangeStatus(row, next));
 
   const appliedProjectId = parseProjectFilter(searchParams.get("projectId"));
   const appliedStatus = parseStatusFilter(searchParams.get("status"));
@@ -493,7 +575,12 @@ function MyTasksBody() {
         <>
           <S.DesktopOnly>
             {URGENCY_ORDER.map((bucket) => (
-              <UrgencyDesktop key={bucket} bucket={bucket} rows={grouped[bucket]} />
+              <UrgencyDesktop
+                key={bucket}
+                bucket={bucket}
+                rows={grouped[bucket]}
+                columns={columns}
+              />
             ))}
           </S.DesktopOnly>
           <S.MobileOnly>
@@ -503,6 +590,14 @@ function MyTasksBody() {
                 bucket={bucket}
                 rows={grouped[bucket]}
                 onRegister={(task) => openRegister(task.id)}
+                onEdit={openEdit}
+                canEdit={canEditRow}
+                onToggle={(task, checked) => {
+                  void onChangeStatus(task, checked ? "DONE" : "TODO");
+                }}
+                onStatus={(task, next) => {
+                  void onChangeStatus(task, next);
+                }}
               />
             ))}
           </S.MobileOnly>
@@ -522,6 +617,32 @@ function MyTasksBody() {
           reload();
         }}
       />
+
+      {user && editRow ? (
+        <span ref={editTriggerRef}>
+          <EditTaskPanel
+            open={editOpen}
+            onOpenChange={(open) => {
+              setEditOpen(open);
+              if (!open) setEditRow(null);
+            }}
+            project={editRow.project}
+            task={editRow}
+            me={user}
+            triggerRef={editTriggerRef}
+            canDelete={canEditRow(editRow)}
+            onSuccess={() => {
+              setToast({ open: true, title: "Tarea actualizada" });
+              reload();
+            }}
+            onDeleted={() => {
+              setToast({ open: true, title: "Tarea eliminada" });
+              setEditRow(null);
+              reload();
+            }}
+          />
+        </span>
+      ) : null}
 
       <Toast
         open={toast.open}

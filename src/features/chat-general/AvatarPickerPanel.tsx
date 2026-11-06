@@ -161,11 +161,11 @@ export function AvatarPickerPanel({
   return (
     <Panel ref={scope} aria-labelledby="avatar-picker-title">
       <div data-reveal>
-        <Title id="avatar-picker-title">Elige tu avatar para el chat</Title>
+        <Title id="avatar-picker-title">Elige tu foto de perfil</Title>
       </div>
       <Lead data-reveal>
-        Así te reconocerán en el chat del semillero. Puedes cambiarlo cuando quieras; no se suben
-        fotos.
+        Se usa en toda la cuenta: cabecera, menú y chat del semillero. Puedes cambiarla cuando
+        quieras; el catálogo es fijo y no se suben fotos.
       </Lead>
 
       <Options role="radiogroup" aria-labelledby="avatar-picker-title">
@@ -175,7 +175,7 @@ export function AvatarPickerPanel({
             <Option key={option.key} data-reveal>
               <Radio
                 type="radio"
-                name="chat-avatar"
+                name="account-avatar"
                 value={option.key}
                 checked={checked}
                 onChange={() => setSelected(option.key)}
@@ -198,7 +198,7 @@ export function AvatarPickerPanel({
 
       {selected ? (
         <Lead data-reveal aria-live="polite">
-          Te verán como <strong>{displayName}</strong> con el avatar «
+          Te verán como <strong>{displayName}</strong> con la foto «
           {options.find((option) => option.key === selected)?.label}».
         </Lead>
       ) : null}
@@ -206,7 +206,7 @@ export function AvatarPickerPanel({
       {ui ? (
         <ErrorState
           variant={ui.variant}
-          title="No se pudo guardar el avatar"
+          title="No se pudo guardar la foto de perfil"
           description={ui.description}
           retryAfterSeconds={ui.retryAfterSeconds}
         />
@@ -225,7 +225,7 @@ export function AvatarPickerPanel({
           disabled={!selected || selected === currentAvatar}
           onClick={() => void save()}
         >
-          {currentAvatar ? "Guardar avatar" : "Entrar al chat"}
+          {currentAvatar ? "Guardar foto de perfil" : "Entrar al chat"}
         </Button>
       </Actions>
     </Panel>

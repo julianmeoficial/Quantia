@@ -29,14 +29,12 @@ import {
 } from "@/features/filters";
 import { canAccess, canViewBudgetDetail } from "@/lib/auth";
 import type { AppRole } from "@/lib/auth/navigation";
-import { formatCOP, formatDate, formatPercent } from "@/lib/format";
+import { formatDate, formatPercent } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { useBudgetLowExecutionAlerts } from "@/lib/socket";
 import { useUrlFilters } from "@/lib/url";
 
-import { listCallFixtureCards } from "./callFixtures";
 import * as S from "./InstitutionalOverviewScreen.styles";
-import { isCallFixturesEnabled } from "./isCallFixturesEnabled";
 import { useInstitutionalOverview } from "./useInstitutionalOverview";
 
 const HIGHLIGHT_MS = 2000;
@@ -191,8 +189,6 @@ export function InstitutionalOverviewScreen() {
   const roles = (identity?.roles ?? []) as readonly AppRole[];
   const allowed = canAccess("/institucional", roles);
   const columns = useMemo(() => buildColumns(user), [user]);
-  const callCards = useMemo(() => listCallFixtureCards(), []);
-  const fixturesOn = isCallFixturesEnabled();
 
   const chips = useMemo((): FilterChip[] => {
     const next: FilterChip[] = [];
@@ -290,7 +286,7 @@ export function InstitutionalOverviewScreen() {
       <S.Header>
         <S.HeaderText>
           <S.Title>Vista institucional</S.Title>
-          <S.Subtitle>Alcance institucional · proyectos y convocatorias.</S.Subtitle>
+          <S.Subtitle>Alcance institucional · proyectos del semillero.</S.Subtitle>
         </S.HeaderText>
         <S.HeaderActions>
           <Button
@@ -352,74 +348,6 @@ export function InstitutionalOverviewScreen() {
             title="Indicadores"
           />
 
-          <S.Section aria-labelledby="institutional-alerts">
-            <S.SectionTitle id="institutional-alerts">¿Qué necesita atención hoy?</S.SectionTitle>
-            <AlertList
-              items={noFilteredProjects ? [] : mergedAlerts}
-              highlightedIds={highlightedIds}
-              emptyTitle={noFilteredProjects ? "Sin resultados con estos filtros" : "Todo al día"}
-              emptyDescription={
-                noFilteredProjects
-                  ? "Prueba con otros filtros o limpia la búsqueda."
-                  : "Sin alertas pendientes en el alcance institucional."
-              }
-            />
-          </S.Section>
-
-          <S.Section aria-labelledby="institutional-comparison">
-            <S.SectionTitle id="institutional-comparison">
-              ¿Dónde está la desviación?
-            </S.SectionTitle>
-            <EmptyState
-              kind="no-records"
-              title="Comparación no disponible"
-              description="No hay medidas agregadas fiables de avance frente a ejecución a escala institucional. No se inventan porcentajes ni gráficas."
-            />
-          </S.Section>
-
-          <S.Section aria-labelledby="institutional-calls">
-            <S.SectionTitle id="institutional-calls">Convocatorias</S.SectionTitle>
-            {fixturesOn && callCards.length > 0 ? (
-              <>
-                <S.DemoBanner role="note">
-                  Datos de demostración — sin contrato de convocatorias. Solo visibles en
-                  desarrollo.
-                </S.DemoBanner>
-                <S.CallGrid>
-                  {callCards.map((card) => (
-                    <S.CallCard key={card.id}>
-                      <S.CallCardTitle>
-                        <Link href={card.href}>{card.title}</Link>
-                      </S.CallCardTitle>
-                      <S.CallCardMeta>{card.periodLabel}</S.CallCardMeta>
-                      <S.CallCardMetrics>
-                        <S.CallMetric>
-                          <S.CallMetricLabel>Techo</S.CallMetricLabel>
-                          <S.CallMetricValue>{formatCOP(card.budgetAmount)}</S.CallMetricValue>
-                        </S.CallMetric>
-                        <S.CallMetric>
-                          <S.CallMetricLabel>Ejecutado</S.CallMetricLabel>
-                          <S.CallMetricValue>{formatCOP(card.executedAmount)}</S.CallMetricValue>
-                        </S.CallMetric>
-                        <S.CallMetric>
-                          <S.CallMetricLabel>Proyectos</S.CallMetricLabel>
-                          <S.CallMetricValue>{card.projectCount}</S.CallMetricValue>
-                        </S.CallMetric>
-                      </S.CallCardMetrics>
-                      <Link href={card.href}>Ver convocatoria</Link>
-                    </S.CallCard>
-                  ))}
-                </S.CallGrid>
-              </>
-            ) : (
-              <EmptyState
-                kind="no-records"
-                title="Integración no disponible"
-                description="La vista por convocatoria aún no tiene contrato en la API. No se inventan totales ni listados."
-              />
-            )}
-          </S.Section>
-
           <S.Section aria-labelledby="institutional-detail">
             <S.SectionHeading>
               <S.SectionTitle id="institutional-detail">Proyectos institucionales</S.SectionTitle>
@@ -442,6 +370,20 @@ export function InstitutionalOverviewScreen() {
                       onPageSizeChange: (pageSize) => setFilters({ page: 1, pageSize }),
                     }
                   : undefined
+              }
+            />
+          </S.Section>
+
+          <S.Section aria-labelledby="institutional-alerts">
+            <S.SectionTitle id="institutional-alerts">¿Qué necesita atención hoy?</S.SectionTitle>
+            <AlertList
+              items={noFilteredProjects ? [] : mergedAlerts}
+              highlightedIds={highlightedIds}
+              emptyTitle={noFilteredProjects ? "Sin resultados con estos filtros" : "Todo al día"}
+              emptyDescription={
+                noFilteredProjects
+                  ? "Prueba con otros filtros o limpia la búsqueda."
+                  : "Sin alertas pendientes en el alcance institucional."
               }
             />
           </S.Section>

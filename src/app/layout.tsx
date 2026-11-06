@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Source_Sans_3, Urbanist } from "next/font/google";
 
 import { Providers } from "@/providers";
@@ -30,6 +30,13 @@ export const metadata: Metadata = {
     template: "%s | Quantia",
   },
   description: "Gestión de proyectos de investigación del semillero INNOVATEK'S / GITEMOS.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // The on-screen keyboard shrinks the layout viewport, so the chat composer stays in view.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

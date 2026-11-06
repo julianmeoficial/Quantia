@@ -86,10 +86,6 @@ export function canGenerateReport(me: UserResponse, kind: ReportKind): boolean {
   return false;
 }
 
-export function canViewAudit(me: UserResponse): boolean {
-  return isAdmin(me);
-}
-
 export function canRetrySync(me: UserResponse): boolean {
   return isAdmin(me);
 }

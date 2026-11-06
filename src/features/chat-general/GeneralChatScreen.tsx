@@ -113,10 +113,24 @@ export function GeneralChatScreen() {
   );
 
   // ---------- Scroll management ----------
-  const scrollToBottom = useCallback((behavior: ScrollBehavior) => {
+  // Programmatic scrolling must never fight the person: a finger drag, a trackpad inertia
+  // glide or a mouse wheel always wins over «follow the tail».
+  const lastUserInputAt = useRef(0);
+  const programmaticUntil = useRef(0);
+  const markUserInput = useCallback(() => {
+    lastUserInputAt.current = performance.now();
+    programmaticUntil.current = 0;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior, force = false) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior });
+    // A glide in progress (trackpad inertia, flick) keeps running: don't yank it.
+    if (!force && performance.now() - lastUserInputAt.current < 350) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next: ScrollBehavior = reduce ? "auto" : behavior;
+    if (next === "smooth") programmaticUntil.current = performance.now() + 600;
+    el.scrollTo({ top: el.scrollHeight, behavior: next });
     atBottomRef.current = true;
   }, []);
 
@@ -124,6 +138,8 @@ export function GeneralChatScreen() {
     const el = scrollerRef.current;
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+    // While our own smooth scroll is travelling, intermediate positions aren't «left the bottom».
+    if (!atBottom && performance.now() < programmaticUntil.current) return;
     atBottomRef.current = atBottom;
     if (atBottom) {
       setPendingNew(0);
@@ -168,7 +184,7 @@ export function GeneralChatScreen() {
     if (!lastEntry.live) return;
     const mine = lastEntry.message.author.id === chat.meId;
     if (mine || atBottomRef.current) {
-      requestAnimationFrame(() => scrollToBottom("smooth"));
+      requestAnimationFrame(() => scrollToBottom("smooth", mine));
       if (!mine) chat.markReadUpToLatest();
     } else {
       setPendingNew((count) => count + 1);
@@ -206,7 +222,9 @@ export function GeneralChatScreen() {
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [chat.phase, requestOlder]);
+    // Re-observe after every page: the observer only reports a *change* in visibility, so a
+    // short page that leaves the sentinel in range would otherwise never request the next one.
+  }, [chat.phase, chat.entries.length, chat.isFetchingOlder, requestOlder]);
 
   // Mark read when the tab becomes visible again at the bottom.
   useEffect(() => {
@@ -442,7 +460,7 @@ export function GeneralChatScreen() {
           {user ? (
             <Button type="button" intent="ghost" size="md" onClick={() => setAvatarOpen(true)}>
               <Avatar name={user.fullName} avatarKey={user.avatar} announceName={false} />
-              Cambiar avatar
+              Cambiar foto de perfil
             </Button>
           ) : null}
         </S.HeaderActions>
@@ -467,6 +485,11 @@ export function GeneralChatScreen() {
               aria-busy={chat.isFetchingOlder || undefined}
               tabIndex={0}
               onScroll={onScroll}
+              onWheel={markUserInput}
+              onTouchStart={markUserInput}
+              onTouchMove={markUserInput}
+              onPointerDown={markUserInput}
+              onKeyDown={markUserInput}
             >
               <S.Rows>
                 <S.Sentinel ref={sentinelRef} aria-hidden />
@@ -564,7 +587,7 @@ export function GeneralChatScreen() {
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
                     setPendingNew(0);
-                    scrollToBottom("smooth");
+                    scrollToBottom("smooth", true);
                     chat.markReadUpToLatest();
                   }}
                 >
@@ -651,7 +674,7 @@ export function GeneralChatScreen() {
         <Sheet
           open={avatarOpen}
           onOpenChange={setAvatarOpen}
-          title="Cambiar avatar"
+          title="Cambiar foto de perfil"
           description="Elige cómo te verán en el chat."
         >
           <AvatarPickerPanel

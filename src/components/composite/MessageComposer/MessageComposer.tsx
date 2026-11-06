@@ -5,6 +5,7 @@ import { useRef, type FormEvent, type KeyboardEvent, type Ref } from "react";
 
 import { Button, IconButton, TextArea } from "@/components/base";
 import { EditIcon, ReplyIcon, SendIcon, XIcon } from "@/components/base/icons";
+import { useCoarsePointer } from "@/lib/device";
 import { transitions } from "@/lib/motion";
 
 import * as S from "./MessageComposer.styles";
@@ -57,6 +58,8 @@ export function MessageComposer({
   textareaRef,
 }: MessageComposerProps) {
   const composing = useRef(false);
+  // Touch keyboards: Enter is a line break and the send button sends. Hardware keyboards: Enter sends.
+  const coarse = useCoarsePointer();
   const [sendScope, animateSend] = useAnimate<HTMLSpanElement>();
   const trimmed = value.trim();
   const tooLong = value.length > maxLength;
@@ -94,7 +97,7 @@ export function MessageComposer({
       onEditLast();
       return;
     }
-    if (event.key !== "Enter" || event.shiftKey) return;
+    if (event.key !== "Enter" || event.shiftKey || coarse) return;
     event.preventDefault();
     submit();
   }
@@ -146,11 +149,15 @@ export function MessageComposer({
         error={error}
         description={helpText}
         placeholder="Escribe un mensaje para el semillero"
+        enterKeyHint={coarse ? "enter" : "send"}
+        autoCapitalize="sentences"
       />
       <S.Actions>
         <S.Hint>
-          Enter envía · Shift+Enter salto de línea
-          {onEditLast && !editing ? " · ↑ edita tu último mensaje" : ""}
+          {coarse
+            ? "Toca enviar para mandar el mensaje"
+            : "Enter envía · Shift+Enter salto de línea"}
+          {!coarse && onEditLast && !editing ? " · ↑ edita tu último mensaje" : ""}
         </S.Hint>
         <S.ActionGroup>
           <AnimatePresence initial={false}>
