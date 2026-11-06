@@ -83,10 +83,17 @@ export const Bubble = styled.div<
   overflow: hidden;
   transition: opacity ${({ theme }) => theme.motion.duration.base}
     ${({ theme }) => theme.motion.easing.standard};
+
+  /* Touch: a hold opens our actions (with «Copiar»), not the system text-selection callout. */
+  @media (pointer: coarse) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 `;
 
 /** Locate highlight (quote jump): opacity-only overlay, 1–2 s, no layout change. */
-export const Highlight = styled(motion.span)`
+export const Highlight = styled(motion.span)<{ $static?: boolean }>`
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -94,6 +101,7 @@ export const Highlight = styled(motion.span)`
   box-shadow: inset 0 0 0 ${({ theme }) => theme.borderWidths.thick}
     ${({ theme }) => theme.colors.status.info.icon};
   pointer-events: none;
+  opacity: ${({ $static }) => ($static ? 1 : undefined)};
 `;
 
 export const Quote = styled.button<Own>`
@@ -193,7 +201,7 @@ export const Toolbar = styled.div<Own>`
   background: ${({ theme }) => theme.colors.bg.surface};
   box-shadow: ${({ theme }) => theme.elevation.sm};
   opacity: 0;
-  transform: translateY(-40%) scale(0.96);
+  transform: translateY(calc(-100% + ${({ theme }) => theme.space[4]})) scale(0.96);
   pointer-events: none;
   transition:
     opacity ${({ theme }) => theme.motion.duration.fast}
@@ -204,20 +212,20 @@ export const Toolbar = styled.div<Own>`
   ${Root}:focus-within &,
   ${Root}[data-actions="open"] & {
     opacity: 1;
-    transform: translateY(-50%) scale(1);
+    transform: translateY(calc(-100% - ${({ theme }) => theme.space[4]})) scale(1);
     pointer-events: auto;
   }
 
   @media (hover: hover) {
     ${Root}:hover & {
       opacity: 1;
-      transform: translateY(-50%) scale(1);
+      transform: translateY(calc(-100% - ${({ theme }) => theme.space[4]})) scale(1);
       pointer-events: auto;
     }
   }
 
   ${({ theme }) => theme.media.reducedMotion} {
-    transform: translateY(-50%);
+    transform: translateY(calc(-100% - ${({ theme }) => theme.space[4]}));
   }
 `;
 

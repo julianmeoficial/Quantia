@@ -8,6 +8,7 @@ const Frame = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   background: ${({ theme }) => theme.colors.bg.canvas};
 `;
 
@@ -25,11 +26,12 @@ const Body = styled.div`
   padding: ${({ theme }) => theme.space[16]};
 `;
 
+/** Matches AppShell: rail only from `lg` (1280); tablets use the drawer. */
 const Side = styled.div`
   display: none;
   width: ${({ theme }) => theme.layout.sidebar};
 
-  ${({ theme }) => theme.media.up("md")} {
+  ${({ theme }) => theme.media.up("lg")} {
     display: block;
   }
 `;

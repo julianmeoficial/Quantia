@@ -6,58 +6,117 @@ import { DropdownMenu as DropdownMenuPrimitive, Popover as PopoverPrimitive } fr
 import styled, { css, keyframes } from "styled-components";
 
 import { Avatar, initialsFromName, Link } from "@/components/base";
+import { BellIcon } from "@/components/base/icons";
 import { focusRing } from "@/components/base/shared/focus";
 import { ConnectionStatus } from "@/components/system";
 import type { ConnectionState } from "@/components/system";
 import { formatDate } from "@/lib/format";
 
+/**
+ * One row at every width (never wraps into a second line on phones). Sticky and translucent
+ * with a backdrop blur, so content scrolls under it the way iOS/macOS bars behave.
+ */
 const Header = styled.header`
+  position: sticky;
+  top: 0;
+  z-index: ${({ theme }) => theme.zIndices.sticky};
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space[12]};
+  gap: ${({ theme }) => theme.space[8]};
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: ${({ theme }) => theme.layout.header};
-  padding: 0 ${({ theme }) => theme.space[16]};
+  height: ${({ theme }) => theme.layout.header};
+  flex: none;
+  padding: 0 ${({ theme }) => theme.space[8]} 0 ${({ theme }) => theme.space[8]};
   background: ${({ theme }) => theme.colors.bg.surface};
   border-bottom: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
+
+  @supports (backdrop-filter: blur(1rem)) {
+    background: color-mix(in srgb, ${({ theme }) => theme.colors.bg.surface} 82%, transparent);
+    backdrop-filter: saturate(1.6) blur(0.75rem);
+  }
+
+  ${({ theme }) => theme.media.up("md")} {
+    gap: ${({ theme }) => theme.space[12]};
+    padding: 0 ${({ theme }) => theme.space[16]};
+  }
 `;
 
+const CrumbNav = styled.nav`
+  flex: 1 1 auto;
+  min-width: 0;
+`;
+
+/** Phones show only the current section; tablets and desktops show the full trail. */
 const Crumbs = styled.ol`
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: ${({ theme }) => theme.space[8]};
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
   color: ${({ theme }) => theme.colors.text.secondary};
   font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: ${({ theme }) => theme.space[8]};
+    min-width: 0;
+  }
+
+  li + li::before {
+    content: "/";
+    color: ${({ theme }) => theme.colors.border.control};
+  }
+
+  li:not(:last-child) {
+    display: none;
+  }
+
+  ${({ theme }) => theme.media.up("md")} {
+    li:not(:last-child) {
+      display: flex;
+    }
+  }
 `;
 
 const Current = styled.span`
+  overflow: hidden;
   color: ${({ theme }) => theme.colors.text.primary};
+  font-size: ${({ theme }) => theme.typography.bodyStrong.fontSize};
+  font-weight: ${({ theme }) => theme.typography.bodyStrong.fontWeight};
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  ${({ theme }) => theme.media.up("md")} {
+    font-size: ${({ theme }) => theme.typography.bodySmall.fontSize};
+    font-weight: ${({ theme }) => theme.typography.label.fontWeight};
+  }
 `;
 
 const Tools = styled.div`
   display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: ${({ theme }) => theme.space[8]};
+  gap: ${({ theme }) => theme.space[4]};
   min-width: 0;
-  max-width: 100%;
+
+  ${({ theme }) => theme.media.up("md")} {
+    gap: ${({ theme }) => theme.space[8]};
+  }
 `;
 
 const StatusSlot = styled.div`
-  flex: 1 1 ${({ theme }) => `calc(${theme.space[64]} * 2)`};
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 100%;
 `;
 
 const Role = styled.span`
@@ -130,8 +189,9 @@ const floatingMotion = css`
 
 const Panel = styled(PopoverPrimitive.Content)`
   ${floatingMotion}
-  z-index: ${({ theme }) => theme.zIndices.overlay};
+  z-index: ${({ theme }) => theme.zIndices.dropdown};
   width: calc(${({ theme }) => theme.layout.sidebar} + ${({ theme }) => theme.space[32]});
+  max-width: calc(100vw - ${({ theme }) => theme.space[16]});
   max-height: min(70vh, 28rem);
   overflow: auto;
   padding: ${({ theme }) => theme.space[16]};
@@ -198,7 +258,7 @@ const Empty = styled.p`
 
 const Menu = styled(DropdownMenuPrimitive.Content)`
   ${floatingMotion}
-  z-index: ${({ theme }) => theme.zIndices.overlay};
+  z-index: ${({ theme }) => theme.zIndices.dropdown};
   min-width: ${({ theme }) => theme.layout.sidebar};
   padding: ${({ theme }) => theme.space[8]};
   background: ${({ theme }) => theme.colors.bg.surface};
@@ -226,18 +286,57 @@ const MenuItem = styled(DropdownMenuPrimitive.Item)`
   ${focusRing}
 `;
 
+/** Bell icon on phones (44 px target); icon + «Avisos» from `md`. */
 const NoticeButton = styled.button`
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${({ theme }) => theme.space[8]};
+  min-width: ${({ theme }) => theme.sizes.control};
   min-height: ${({ theme }) => theme.sizes.control};
-  padding: 0 ${({ theme }) => theme.space[12]};
-  border: ${({ theme }) => theme.borderWidths.thin} solid
-    ${({ theme }) => theme.colors.border.control};
-  border-radius: ${({ theme }) => theme.radii.control};
-  background: ${({ theme }) => theme.colors.bg.surface};
+  padding: 0;
+  border: 0;
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: transparent;
   color: ${({ theme }) => theme.colors.text.primary};
   font-size: ${({ theme }) => theme.typography.label.fontSize};
+  font-weight: ${({ theme }) => theme.typography.label.fontWeight};
   cursor: pointer;
+  transition:
+    background ${({ theme }) => theme.motion.duration.fast}
+      ${({ theme }) => theme.motion.easing.standard},
+    transform ${({ theme }) => theme.motion.duration.fast}
+      ${({ theme }) => theme.motion.easing.standard};
   ${focusRing}
+
+  @media (hover: hover) {
+    &:hover {
+      background: ${({ theme }) => theme.colors.bg.subtle};
+    }
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  ${({ theme }) => theme.media.up("md")} {
+    padding: 0 ${({ theme }) => theme.space[12]};
+    border-radius: ${({ theme }) => theme.radii.control};
+  }
+`;
+
+const NoticeLabel = styled.span`
+  display: none;
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: inline;
+  }
+`;
+
+const NoticeGlyph = styled.span`
+  display: inline-flex;
+  font-size: ${({ theme }) => theme.typography.headingSmall.fontSize};
 `;
 
 const CountBadge = styled.span`
@@ -323,7 +422,7 @@ export function AppHeader({
   return (
     <Header>
       {menu}
-      <nav aria-label="Migas de pan">
+      <CrumbNav aria-label="Migas de pan">
         <Crumbs>
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
@@ -338,7 +437,7 @@ export function AppHeader({
             );
           })}
         </Crumbs>
-      </nav>
+      </CrumbNav>
       <Tools>
         <StatusSlot>
           <ConnectionStatus state={connection} onReconnect={onReconnect} />
@@ -351,7 +450,10 @@ export function AppHeader({
         >
           <PopoverPrimitive.Trigger asChild>
             <NoticeButton type="button" aria-label={badgeLabel}>
-              Avisos
+              <NoticeGlyph aria-hidden>
+                <BellIcon />
+              </NoticeGlyph>
+              <NoticeLabel>Avisos</NoticeLabel>
               {unreadCount > 0 ? (
                 <CountBadge key={unreadCount} aria-hidden>
                   {unreadCount > 9 ? "9+" : unreadCount}
@@ -360,7 +462,7 @@ export function AppHeader({
             </NoticeButton>
           </PopoverPrimitive.Trigger>
           <PopoverPrimitive.Portal>
-            <Panel>
+            <Panel align="end" sideOffset={8} collisionPadding={8}>
               <PanelTitle>Avisos de esta sesión</PanelTitle>
               {notices.length === 0 ? (
                 <Empty>Sin avisos en esta sesión.</Empty>
@@ -397,7 +499,7 @@ export function AppHeader({
             </AccountButton>
           </DropdownMenuPrimitive.Trigger>
           <DropdownMenuPrimitive.Portal>
-            <Menu>
+            <Menu align="end" sideOffset={8} collisionPadding={8}>
               <MenuLabel>{userName}</MenuLabel>
               {onLogout ? <MenuItem onSelect={onLogout}>Cerrar sesión</MenuItem> : null}
             </Menu>

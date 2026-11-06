@@ -1,5 +1,6 @@
 export { AlertIcon } from "./AlertIcon";
 export { ArrowDownIcon } from "./ArrowDownIcon";
+export { BellIcon } from "./BellIcon";
 export { CalendarIcon } from "./CalendarIcon";
 export { CheckCircleIcon } from "./CheckCircleIcon";
 export { CheckDoubleIcon } from "./CheckDoubleIcon";
@@ -7,6 +8,7 @@ export { CheckIcon } from "./CheckIcon";
 export { ChevronIcon } from "./ChevronIcon";
 export { CircleIcon } from "./CircleIcon";
 export { ClockIcon } from "./ClockIcon";
+export { CopyIcon } from "./CopyIcon";
 export { EditIcon } from "./EditIcon";
 export { ExternalIcon } from "./ExternalIcon";
 export { FolderIcon } from "./FolderIcon";

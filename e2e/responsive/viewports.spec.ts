@@ -67,13 +67,15 @@ test.describe("DS-132 responsive viewports", () => {
         await expect(page.getByRole("heading", { name: "Mis tareas" })).toBeVisible();
         await assertNoPageHorizontalScroll(page);
 
-        if (vp.width < 768) {
+        // AppShell drawer until `lg` (1280); inline rail from 1280 up.
+        if (vp.width < 1280) {
           const menu = page.getByRole("button", { name: "Abrir navegación" });
           await expect(menu).toBeVisible();
           await menu.click();
           await expect(page.getByRole("navigation", { name: /secciones/i })).toBeVisible();
           await page.keyboard.press("Escape");
         } else {
+          await expect(page.getByRole("button", { name: "Abrir navegación" })).toHaveCount(0);
           await expect(page.getByRole("navigation", { name: /secciones/i })).toBeVisible();
         }
 

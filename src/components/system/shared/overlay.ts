@@ -20,11 +20,29 @@ const panelEnter = keyframes`
   }
 `;
 
-/** Overlay uses the text.primary token at 40% via color-mix — no free hex. */
+/**
+ * Scrim that always darkens: light mode tints with text.primary (dark ink); dark mode uses the
+ * canvas token, because there text.primary is light and would wash the page out in grey.
+ */
+const darkScrim = css`
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.bg.canvas} 72%, transparent);
+`;
+
 export const overlayStyles = css`
   position: fixed;
   inset: 0;
   background: color-mix(in srgb, ${({ theme }) => theme.colors.text.primary} 40%, transparent);
+
+  :root[data-theme="dark"] & {
+    ${darkScrim}
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) & {
+      ${darkScrim}
+    }
+  }
+
   z-index: ${({ theme }) => theme.zIndices.overlay};
   animation: ${fadeIn} ${({ theme }) => theme.motion.duration.base}
     ${({ theme }) => theme.motion.easing.standard};

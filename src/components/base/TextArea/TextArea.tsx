@@ -10,6 +10,8 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   error?: string;
   /** Visible `n/max` counter (polite live region). Chat composers render their own. */
   showCounter?: boolean;
+  /** Keep the label for assistive tech but hide it visually (e.g. a chat composer). */
+  hideLabel?: boolean;
   ref?: Ref<HTMLTextAreaElement>;
 }
 
@@ -23,6 +25,7 @@ export function TextArea({
   value,
   rows = 4,
   showCounter = true,
+  hideLabel = false,
   ...rest
 }: TextAreaProps) {
   const generatedId = useId();
@@ -34,7 +37,7 @@ export function TextArea({
 
   return (
     <S.Field>
-      <S.Label htmlFor={fieldId}>
+      <S.Label htmlFor={fieldId} $hidden={hideLabel}>
         {label}
         {required ? <S.Required> (obligatorio)</S.Required> : null}
       </S.Label>

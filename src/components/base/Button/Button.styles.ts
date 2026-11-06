@@ -37,8 +37,11 @@ export const Root = styled.button<{
 
   ${focusRing}
 
+  /* Press: a short squeeze (iOS-like), released with the same 150 ms curve. */
+  -webkit-tap-highlight-color: transparent;
+
   &:active:not(:disabled) {
-    transform: translateY(0.0625rem);
+    transform: scale(0.97);
   }
 
   &:disabled {

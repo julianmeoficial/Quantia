@@ -9,7 +9,12 @@ export const Field = styled.div`
   width: 100%;
 `;
 
-export const Label = styled.label`
+export const Label = styled.label<{ $hidden?: boolean }>`
+  ${({ $hidden }) =>
+    $hidden
+      ? `position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+         overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;`
+      : ""}
   font-size: ${({ theme }) => theme.typography.label.fontSize};
   line-height: ${({ theme }) => theme.typography.label.lineHeight};
   font-weight: ${({ theme }) => theme.typography.label.fontWeight};

@@ -4,17 +4,6 @@ import styled, { keyframes } from "styled-components";
 
 import { overlayStyles } from "@/components/system/shared/overlay";
 
-const enter = keyframes`
-  from {
-    opacity: 0;
-    transform: translateX(-100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-`;
-
 export const Shell = styled.nav<{ $fill?: boolean }>`
   display: flex;
   flex-direction: column;
@@ -170,6 +159,10 @@ export const Profile = styled.div`
 
 export const Overlay = styled(DialogPrimitive.Overlay)`
   ${overlayStyles}
+
+  @supports (backdrop-filter: blur(1rem)) {
+    backdrop-filter: blur(0.125rem);
+  }
 `;
 
 const clip = `
@@ -192,21 +185,21 @@ export const DialogDescription = styled(DialogPrimitive.Description)`
   ${clip}
 `;
 
-export const Drawer = styled(DialogPrimitive.Content)`
+/** Drawer panel (Motion element rendered through `Dialog.Content asChild`). */
+export const Drawer = styled(motion.div)`
   position: fixed;
   inset: 0 auto 0 0;
   display: flex;
   flex-direction: column;
   z-index: ${({ theme }) => theme.zIndices.modal};
-  width: ${({ theme }) => theme.layout.sidebar};
+  width: min(20rem, 86vw);
   height: 100%;
+  height: 100dvh;
   background: ${({ theme }) => theme.colors.bg.surface};
-  animation: ${enter} ${({ theme }) => theme.motion.duration.slow}
-    ${({ theme }) => theme.motion.easing.standard};
-
-  ${({ theme }) => theme.media.reducedMotion} {
-    animation: none;
-  }
+  border-right: ${({ theme }) => theme.borderWidths.thin} solid
+    ${({ theme }) => theme.colors.border.subtle};
+  box-shadow: ${({ theme }) => theme.elevation.lg};
+  touch-action: pan-y;
 
   &:focus {
     outline: none;
@@ -217,6 +210,25 @@ export const Drawer = styled(DialogPrimitive.Content)`
       ${({ theme }) => theme.colors.focus.ring};
     outline-offset: ${({ theme }) => theme.borderWidths.thick};
   }
+`;
+
+export const DrawerHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space[8]};
+  min-height: ${({ theme }) => theme.layout.header};
+  padding: 0 ${({ theme }) => theme.space[8]} 0 ${({ theme }) => theme.space[16]};
+  border-bottom: ${({ theme }) => theme.borderWidths.thin} solid
+    ${({ theme }) => theme.colors.border.subtle};
+`;
+
+export const Brand = styled.span`
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-family: ${({ theme }) => theme.fonts.heading};
+  font-size: ${({ theme }) => theme.typography.headingSmall.fontSize};
+  font-weight: ${({ theme }) => theme.typography.headingSmall.fontWeight};
+  letter-spacing: -0.01em;
 `;
 
 export const VisuallyHidden = styled.span`
