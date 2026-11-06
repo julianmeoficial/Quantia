@@ -24,11 +24,18 @@ export const Root = styled.button<{
     border-color ${({ theme }) => theme.motion.duration.fast}
       ${({ theme }) => theme.motion.easing.standard},
     color ${({ theme }) => theme.motion.duration.fast}
+      ${({ theme }) => theme.motion.easing.standard},
+    transform ${({ theme }) => theme.motion.duration.fast}
       ${({ theme }) => theme.motion.easing.standard};
+  -webkit-tap-highlight-color: transparent;
 
   ${({ $intent }) => intentStyles[$intent]}
 
   ${focusRing}
+
+  &:active:not(:disabled) {
+    transform: scale(0.92);
+  }
 
   &:disabled {
     cursor: not-allowed;
@@ -46,6 +53,10 @@ export const Root = styled.button<{
 
   ${({ theme }) => theme.media.reducedMotion} {
     transition: none;
+
+    &:active:not(:disabled) {
+      transform: none;
+    }
   }
 `;
 

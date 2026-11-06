@@ -97,3 +97,8 @@ export const Check = styled.span`
   margin-left: auto;
   color: ${({ theme }) => theme.colors.brand.primary};
 `;
+
+export const Settle = styled.span`
+  display: inline-flex;
+  transform-origin: center;
+`;

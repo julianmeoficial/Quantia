@@ -1,11 +1,13 @@
 "use client";
 
 import type { AvatarKey } from "@quantia/contracts";
-import { LayoutGroup } from "motion/react";
+import { LayoutGroup, type PanInfo } from "motion/react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useId, type ReactNode } from "react";
 
-import { Avatar, Link } from "@/components/base";
+import { Avatar, IconButton, Link } from "@/components/base";
+import { XIcon } from "@/components/base/icons";
+import { haptic } from "@/lib/device";
 import { transitions } from "@/lib/motion";
 
 import * as S from "./RoleSidebar.styles";
@@ -47,16 +49,22 @@ function Navigation({
   profileName,
   avatarKey = null,
   fill = false,
+  onNavigate,
 }: Required<Pick<RoleSidebarProps, "label" | "items" | "currentPath" | "profileName">> & {
   avatarKey?: AvatarKey | null;
   fill?: boolean;
+  onNavigate?: () => void;
 }) {
   // One LayoutGroup per instance so the inline rail and the drawer never share the pill.
   const groupId = useId();
   return (
     <S.Shell aria-label={label} $fill={fill}>
       <LayoutGroup id={groupId}>
-        <S.List>
+        <S.List
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest("a")) onNavigate?.();
+          }}
+        >
           {items.map((item) => {
             const active = isActiveHref(item.href, currentPath);
             return (
@@ -100,22 +108,49 @@ export function RoleSidebar({
   onOpenChange,
 }: RoleSidebarProps) {
   if (variant === "drawer") {
+    const close = () => onOpenChange?.(false);
+    const onDragEnd = (_: unknown, info: PanInfo) => {
+      // A deliberate leftward swipe (distance or flick) closes; anything less springs back.
+      if (info.offset.x < -72 || info.velocity.x < -480) {
+        haptic("light");
+        close();
+      }
+    };
     return (
       <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
         <DialogPrimitive.Portal>
           <S.Overlay />
-          <S.Drawer>
-            <S.DialogTitle>Secciones</S.DialogTitle>
-            <S.DialogDescription>Navegación disponible para este rol.</S.DialogDescription>
-            <Navigation
-              label={label}
-              items={items}
-              currentPath={currentPath}
-              profileName={profileName}
-              avatarKey={avatarKey}
-              fill
-            />
-          </S.Drawer>
+          <DialogPrimitive.Content asChild>
+            <S.Drawer
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              transition={transitions.layout}
+              drag="x"
+              dragDirectionLock
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={{ left: 0.7, right: 0 }}
+              dragSnapToOrigin
+              onDragEnd={onDragEnd}
+            >
+              <S.DialogTitle>Secciones</S.DialogTitle>
+              <S.DialogDescription>Navegación disponible para este rol.</S.DialogDescription>
+              <S.DrawerHeader>
+                <S.Brand>Quantia</S.Brand>
+                <DialogPrimitive.Close asChild>
+                  <IconButton accessibleLabel="Cerrar navegación" icon={<XIcon />} />
+                </DialogPrimitive.Close>
+              </S.DrawerHeader>
+              <Navigation
+                label={label}
+                items={items}
+                currentPath={currentPath}
+                profileName={profileName}
+                avatarKey={avatarKey}
+                fill
+                onNavigate={close}
+              />
+            </S.Drawer>
+          </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     );

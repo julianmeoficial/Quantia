@@ -10,8 +10,9 @@ import { ConfirmDialog, EmptyState, ErrorState, Sheet, Skeleton } from "@/compon
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorStatePropsFromApiError } from "@/lib/api/errorUi";
 import { readDraft, saveDraft } from "@/lib/auth";
+import { haptic } from "@/lib/device";
 import { gsap, MOTION_QUERIES, useGSAP } from "@/lib/gsap";
-import { transitions } from "@/lib/motion";
+import { gsapDurations, transitions } from "@/lib/motion";
 
 import { AvatarPickerPanel } from "./AvatarPickerPanel";
 import { seenByCount, type ChatEntry } from "./chatReducer";
@@ -127,7 +128,7 @@ export function GeneralChatScreen() {
     if (!el) return;
     // A glide in progress (trackpad inertia, flick) keeps running: don't yank it.
     if (!force && performance.now() - lastUserInputAt.current < 350) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia(MOTION_QUERIES.reduceMotion).matches;
     const next: ScrollBehavior = reduce ? "auto" : behavior;
     if (next === "smooth") programmaticUntil.current = performance.now() + 600;
     el.scrollTo({ top: el.scrollHeight, behavior: next });
@@ -247,7 +248,7 @@ export function GeneralChatScreen() {
         gsap.from(bubbles, {
           autoAlpha: 0,
           y: 14,
-          duration: 0.25,
+          duration: gsapDurations.slow,
           ease: "power3.out",
           stagger: 0.02,
           clearProps: "opacity,visibility,transform",
@@ -458,9 +459,15 @@ export function GeneralChatScreen() {
             </Button>
           </S.CompactOnly>
           {user ? (
-            <Button type="button" intent="ghost" size="md" onClick={() => setAvatarOpen(true)}>
+            <Button
+              type="button"
+              intent="ghost"
+              size="md"
+              onClick={() => setAvatarOpen(true)}
+              aria-label="Cambiar foto de perfil"
+            >
               <Avatar name={user.fullName} avatarKey={user.avatar} announceName={false} />
-              Cambiar foto de perfil
+              <S.HideOnPhone>Cambiar foto de perfil</S.HideOnPhone>
             </Button>
           ) : null}
         </S.HeaderActions>
@@ -468,148 +475,157 @@ export function GeneralChatScreen() {
 
       <S.Layout>
         <S.Panel>
-          {empty ? (
-            <S.EmptyWrap>
-              <EmptyState
-                kind="no-records"
-                title="Aún no hay mensajes"
-                description="Sé la primera persona en escribir en el chat del semillero."
-              />
-            </S.EmptyWrap>
-          ) : (
-            <S.Scroller
-              ref={scrollerRef}
-              role="log"
-              aria-label="Mensajes del chat general"
-              aria-live="off"
-              aria-busy={chat.isFetchingOlder || undefined}
-              tabIndex={0}
-              onScroll={onScroll}
-              onWheel={markUserInput}
-              onTouchStart={markUserInput}
-              onTouchMove={markUserInput}
-              onPointerDown={markUserInput}
-              onKeyDown={markUserInput}
-            >
-              <S.Rows>
-                <S.Sentinel ref={sentinelRef} aria-hidden />
-                {chat.isFetchingOlder ? (
-                  <S.OlderStatus>Cargando mensajes anteriores…</S.OlderStatus>
-                ) : !chat.hasMore ? (
-                  <S.OlderStatus>Inicio de la conversación</S.OlderStatus>
-                ) : null}
-                <AnimatePresence initial={false}>
-                  {rows.map((row) => {
-                    if (row.kind === "separator") {
+          <S.LogArea>
+            {empty ? (
+              <S.EmptyWrap>
+                <EmptyState
+                  kind="no-records"
+                  title="Aún no hay mensajes"
+                  description="Sé la primera persona en escribir en el chat del semillero."
+                />
+              </S.EmptyWrap>
+            ) : (
+              <S.Scroller
+                ref={scrollerRef}
+                role="log"
+                aria-label="Mensajes del chat general"
+                aria-live="off"
+                aria-busy={chat.isFetchingOlder || undefined}
+                tabIndex={0}
+                onScroll={onScroll}
+                onWheel={markUserInput}
+                onTouchStart={markUserInput}
+                onTouchMove={markUserInput}
+                onPointerDown={(event) => {
+                  markUserInput();
+                  if (!(event.target as Element).closest('[data-actions="open"]'))
+                    setActiveKey(null);
+                }}
+                onKeyDown={markUserInput}
+              >
+                <S.Rows>
+                  <S.Sentinel ref={sentinelRef} aria-hidden />
+                  {chat.isFetchingOlder ? (
+                    <S.OlderStatus>Cargando mensajes anteriores…</S.OlderStatus>
+                  ) : !chat.hasMore ? (
+                    <S.OlderStatus>Inicio de la conversación</S.OlderStatus>
+                  ) : null}
+                  <AnimatePresence initial={false}>
+                    {rows.map((row) => {
+                      if (row.kind === "separator") {
+                        return (
+                          <S.DaySeparator key={row.key}>
+                            <S.DayLabel>{row.label}</S.DayLabel>
+                          </S.DaySeparator>
+                        );
+                      }
+                      if (row.kind === "unread") {
+                        return (
+                          <S.UnreadDivider
+                            key={row.key}
+                            data-unread-divider
+                            initial={{ opacity: 0, scaleX: 0.8 }}
+                            animate={{ opacity: 1, scaleX: 1 }}
+                            transition={transitions.slow}
+                          >
+                            Mensajes nuevos
+                          </S.UnreadDivider>
+                        );
+                      }
+                      const { entry, isOwn, groupPosition } = row;
+                      const deliveryState = entry.local?.status ?? "sent";
                       return (
-                        <S.DaySeparator key={row.key}>
-                          <S.DayLabel>{row.label}</S.DayLabel>
-                        </S.DaySeparator>
-                      );
-                    }
-                    if (row.kind === "unread") {
-                      return (
-                        <S.UnreadDivider
+                        <S.Row
                           key={row.key}
-                          data-unread-divider
-                          initial={{ opacity: 0, scaleX: 0.8 }}
-                          animate={{ opacity: 1, scaleX: 1 }}
-                          transition={transitions.slow}
+                          ref={(node: HTMLLIElement | null) => {
+                            if (node) rowRefs.current.set(row.key, node);
+                            else rowRefs.current.delete(row.key);
+                          }}
+                          data-chat-row
+                          data-own={isOwn}
+                          layout={layoutEnabled ? "position" : false}
+                          initial={entry.live ? { opacity: 0, y: 16, scale: 0.97 } : false}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.92, transition: transitions.base }}
+                          transition={transitions.layout}
                         >
-                          Mensajes nuevos
-                        </S.UnreadDivider>
+                          <ChatMessage
+                            message={entry.message}
+                            deliveryState={deliveryState}
+                            failureText={entry.local?.errorText}
+                            isOwn={isOwn}
+                            groupPosition={groupPosition}
+                            seenBy={
+                              isOwn ? seenByCount(chat.store, entry.message.seq, chat.meId) : 0
+                            }
+                            meId={chat.meId}
+                            reactionOptions={chat.reactions}
+                            pop={
+                              chat.store.lastPop?.messageId === entry.message.id
+                                ? chat.store.lastPop
+                                : null
+                            }
+                            highlightToken={highlight?.key === row.key ? highlight.token : 0}
+                            actionsVisible={activeKey === row.key}
+                            isEditing={editing?.key === row.key}
+                            canEdit={chat.canEdit(entry)}
+                            canDelete={chat.canDelete(entry)}
+                            onActivate={() => setActiveKey(row.key)}
+                            onRetry={() => chat.retry(entry)}
+                            onDiscard={() => chat.discard(entry)}
+                            onReact={(emoji) => void chat.react(entry, emoji)}
+                            onReply={() => startReply(entry)}
+                            onEdit={() => startEdit(entry)}
+                            onDelete={() => setPendingDelete(entry)}
+                            onQuoteClick={(id) => void jumpTo(id)}
+                          />
+                        </S.Row>
                       );
-                    }
-                    const { entry, isOwn, groupPosition } = row;
-                    const deliveryState = entry.local?.status ?? "sent";
-                    return (
-                      <S.Row
-                        key={row.key}
-                        ref={(node: HTMLLIElement | null) => {
-                          if (node) rowRefs.current.set(row.key, node);
-                          else rowRefs.current.delete(row.key);
-                        }}
-                        data-chat-row
-                        data-own={isOwn}
-                        layout={layoutEnabled ? "position" : false}
-                        initial={entry.live ? { opacity: 0, y: 16, scale: 0.97 } : false}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.92, transition: transitions.base }}
-                        transition={transitions.layout}
-                      >
-                        <ChatMessage
-                          message={entry.message}
-                          deliveryState={deliveryState}
-                          failureText={entry.local?.errorText}
-                          isOwn={isOwn}
-                          groupPosition={groupPosition}
-                          seenBy={isOwn ? seenByCount(chat.store, entry.message.seq, chat.meId) : 0}
-                          meId={chat.meId}
-                          reactionOptions={chat.reactions}
-                          pop={
-                            chat.store.lastPop?.messageId === entry.message.id
-                              ? chat.store.lastPop
-                              : null
-                          }
-                          highlightToken={highlight?.key === row.key ? highlight.token : 0}
-                          actionsVisible={activeKey === row.key}
-                          isEditing={editing?.key === row.key}
-                          canEdit={chat.canEdit(entry)}
-                          canDelete={chat.canDelete(entry)}
-                          onActivate={() => setActiveKey(row.key)}
-                          onRetry={() => chat.retry(entry)}
-                          onDiscard={() => chat.discard(entry)}
-                          onReact={(emoji) => void chat.react(entry, emoji)}
-                          onReply={() => startReply(entry)}
-                          onEdit={() => startEdit(entry)}
-                          onDelete={() => setPendingDelete(entry)}
-                          onQuoteClick={(id) => void jumpTo(id)}
-                        />
-                      </S.Row>
-                    );
-                  })}
-                </AnimatePresence>
-              </S.Rows>
-            </S.Scroller>
-          )}
+                    })}
+                  </AnimatePresence>
+                </S.Rows>
+              </S.Scroller>
+            )}
 
-          <TypingIndicator users={socket.typing} />
+            <TypingIndicator users={socket.typing} />
 
-          <S.PillSlot>
-            <AnimatePresence>
-              {pendingNew > 0 ? (
-                <S.NewMessagesPill
-                  type="button"
-                  initial={{ opacity: 0, y: 16, scale: 0.94 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 16, scale: 0.94 }}
-                  transition={transitions.slow}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => {
-                    setPendingNew(0);
-                    scrollToBottom("smooth", true);
-                    chat.markReadUpToLatest();
-                  }}
-                >
-                  <ArrowDownIcon aria-hidden />
-                  {pendingNew === 1 ? "1 mensaje nuevo" : `${pendingNew} mensajes nuevos`}
-                  <S.PillCount aria-hidden>
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      <motion.span
-                        key={pendingNew}
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        transition={transitions.fast}
-                      >
-                        {pendingNew}
-                      </motion.span>
-                    </AnimatePresence>
-                  </S.PillCount>
-                </S.NewMessagesPill>
-              ) : null}
-            </AnimatePresence>
-          </S.PillSlot>
+            <S.PillSlot>
+              <AnimatePresence>
+                {pendingNew > 0 ? (
+                  <S.NewMessagesPill
+                    type="button"
+                    initial={{ opacity: 0, y: 16, scale: 0.94 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 16, scale: 0.94 }}
+                    transition={transitions.slow}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      haptic("selection");
+                      setPendingNew(0);
+                      scrollToBottom("smooth", true);
+                      chat.markReadUpToLatest();
+                    }}
+                  >
+                    <ArrowDownIcon aria-hidden />
+                    {pendingNew === 1 ? "1 mensaje nuevo" : `${pendingNew} mensajes nuevos`}
+                    <S.PillCount aria-hidden>
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={pendingNew}
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 8 }}
+                          transition={transitions.fast}
+                        >
+                          {pendingNew}
+                        </motion.span>
+                      </AnimatePresence>
+                    </S.PillCount>
+                  </S.NewMessagesPill>
+                ) : null}
+              </AnimatePresence>
+            </S.PillSlot>
+          </S.LogArea>
 
           <S.ComposerSlot>
             <AnimatePresence>

@@ -11,6 +11,7 @@ import {
   TASK_STATUS_PRESENTATION,
 } from "@/components/base";
 import type { DomainBadgeStatus } from "@/components/base";
+import { haptic } from "@/lib/device";
 import { formatDate } from "@/lib/format";
 
 import { TaskStatusControl } from "../TaskStatusControl";
@@ -59,7 +60,10 @@ export function TaskRow({
           label={`Marcar «${title}» como completa`}
           labelVisuallyHidden
           checked={checked}
-          onCheckedChange={(next) => onCheckedChange?.(next === true)}
+          onCheckedChange={(next) => {
+            haptic(next === true ? "success" : "selection");
+            onCheckedChange?.(next === true);
+          }}
         />
       ) : (
         <span />

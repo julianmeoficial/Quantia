@@ -46,7 +46,7 @@ Severidad: `critical` · `serious` · `moderate` · `minor`. Estado: `open` · `
 
 ### R-SHELL-01 — Sidebar colapsable (pass)
 
-Drawer Radix &lt; 768; inline ≥ 768. Verificado en smoke.
+Drawer Radix &lt; 1280 (`lg`); inline ≥ 1280. Tablets usan drawer para dejar espacio a tablas. Verificado en smoke.
 
 ### R-TABLE-01 — Tablas (pass)
 

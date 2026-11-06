@@ -1,12 +1,20 @@
 "use client";
 
-import { AnimatePresence, useAnimate } from "motion/react";
+import { AnimatePresence, useAnimate, useReducedMotion } from "motion/react";
 import { useRef, type FormEvent, type KeyboardEvent, type Ref } from "react";
 
-import { Button, IconButton, TextArea } from "@/components/base";
-import { EditIcon, ReplyIcon, SendIcon, XIcon } from "@/components/base/icons";
+import { IconButton, TextArea } from "@/components/base";
+import {
+  CheckIcon,
+  EditIcon,
+  ReplyIcon,
+  SendIcon,
+  SpinnerIcon,
+  XIcon,
+} from "@/components/base/icons";
+import { haptic } from "@/lib/device";
 import { useCoarsePointer } from "@/lib/device";
-import { transitions } from "@/lib/motion";
+import { gsapDurations, transitions } from "@/lib/motion";
 
 import * as S from "./MessageComposer.styles";
 
@@ -60,23 +68,25 @@ export function MessageComposer({
   const composing = useRef(false);
   // Touch keyboards: Enter is a line break and the send button sends. Hardware keyboards: Enter sends.
   const coarse = useCoarsePointer();
+  const reduceMotion = useReducedMotion();
   const [sendScope, animateSend] = useAnimate<HTMLSpanElement>();
   const trimmed = value.trim();
   const tooLong = value.length > maxLength;
   const canSend = !disabled && !isSending && trimmed.length > 0 && !tooLong;
-  const rows = Math.min(MAX_ROWS, Math.max(2, value.split("\n").length));
+  const rows = Math.min(MAX_ROWS, Math.max(1, value.split("\n").length));
   const nearLimit = value.length >= maxLength * 0.8;
   const editing = mode === "edit";
 
   function submit() {
     if (!canSend) return;
-    if (sendScope.current) {
+    if (sendScope.current && !reduceMotion) {
       void animateSend(
         sendScope.current,
         { x: [0, 14, -10, 0], opacity: [1, 0, 0, 1] },
-        { duration: 0.35, times: [0, 0.45, 0.46, 1], ease: "easeOut" },
+        { duration: gsapDurations.slow, times: [0, 0.45, 0.46, 1], ease: "easeOut" },
       );
     }
+    haptic("light");
     onSend();
   }
 
@@ -129,37 +139,54 @@ export function MessageComposer({
         ) : null}
       </AnimatePresence>
 
-      <TextArea
-        ref={textareaRef}
-        label={editing ? "Editar mensaje" : "Mensaje"}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={onBlur}
-        onCompositionStart={() => {
-          composing.current = true;
-        }}
-        onCompositionEnd={() => {
-          composing.current = false;
-        }}
-        maxLength={maxLength}
-        showCounter={false}
-        rows={rows}
-        disabled={disabled}
-        error={error}
-        description={helpText}
-        placeholder="Escribe un mensaje para el semillero"
-        enterKeyHint={coarse ? "enter" : "send"}
-        autoCapitalize="sentences"
-      />
-      <S.Actions>
-        <S.Hint>
-          {coarse
-            ? "Toca enviar para mandar el mensaje"
-            : "Enter envía · Shift+Enter salto de línea"}
-          {!coarse && onEditLast && !editing ? " · ↑ edita tu último mensaje" : ""}
-        </S.Hint>
-        <S.ActionGroup>
+      <S.FieldRow>
+        <S.InputSlot>
+          <TextArea
+            ref={textareaRef}
+            label={editing ? "Editar mensaje" : "Mensaje"}
+            hideLabel
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={onBlur}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={() => {
+              composing.current = false;
+            }}
+            maxLength={maxLength}
+            showCounter={false}
+            rows={rows}
+            disabled={disabled}
+            error={error}
+            description={helpText}
+            placeholder={editing ? "Edita tu mensaje" : "Mensaje"}
+            enterKeyHint={coarse ? "enter" : "send"}
+            autoCapitalize="sentences"
+          />
+        </S.InputSlot>
+        <S.SendButton
+          type="submit"
+          disabled={!canSend}
+          aria-label={editing ? "Guardar cambios" : "Enviar mensaje"}
+          aria-busy={isSending || undefined}
+          whileTap={canSend ? { scale: 0.88 } : undefined}
+          transition={transitions.fast}
+          // Keep the keyboard open on phones: the tap must not blur the field.
+          onPointerDown={(event) => event.preventDefault()}
+        >
+          <S.SendGlyph ref={sendScope}>
+            {isSending ? <SpinnerIcon /> : editing ? <CheckIcon /> : <SendIcon />}
+          </S.SendGlyph>
+        </S.SendButton>
+      </S.FieldRow>
+      {!coarse || nearLimit ? (
+        <S.Actions>
+          <S.Hint>
+            Enter envía · Shift+Enter salto de línea
+            {onEditLast && !editing ? " · ↑ edita tu último mensaje" : ""}
+          </S.Hint>
           <AnimatePresence initial={false}>
             {nearLimit ? (
               <S.Counter
@@ -174,25 +201,8 @@ export function MessageComposer({
               </S.Counter>
             ) : null}
           </AnimatePresence>
-          {editing && onCancelContext ? (
-            <Button type="button" intent="ghost" size="md" onClick={onCancelContext}>
-              Cancelar
-            </Button>
-          ) : null}
-          <Button
-            type="submit"
-            intent="primary"
-            size="md"
-            isLoading={isSending}
-            disabled={!canSend}
-            leadingIcon={
-              <S.SendGlyph ref={sendScope}>{editing ? <EditIcon /> : <SendIcon />}</S.SendGlyph>
-            }
-          >
-            {editing ? "Guardar cambios" : "Enviar"}
-          </Button>
-        </S.ActionGroup>
-      </S.Actions>
+        </S.Actions>
+      ) : null}
     </S.Root>
   );
 }

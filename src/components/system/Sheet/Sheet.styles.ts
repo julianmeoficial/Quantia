@@ -20,6 +20,7 @@ export const Content = styled(DialogPrimitive.Content)`
   inset: auto 0 0 0;
   width: 100%;
   max-height: 90vh;
+  max-height: 90dvh;
   border-radius: ${({ theme }) => `${theme.radii.featured} ${theme.radii.featured} 0 0`};
 
   ${({ theme }) => theme.media.up("md")} {
@@ -28,6 +29,7 @@ export const Content = styled(DialogPrimitive.Content)`
     width: min(28rem, 100vw);
     max-height: none;
     height: 100%;
+    height: 100dvh;
     border-radius: 0;
   }
 
@@ -39,6 +41,30 @@ export const Content = styled(DialogPrimitive.Content)`
     outline: ${({ theme }) => theme.borderWidths.thick} solid
       ${({ theme }) => theme.colors.focus.ring};
     outline-offset: ${({ theme }) => theme.borderWidths.thick};
+  }
+`;
+
+/** Drag zone of the bottom sheet (grabber + header). Vertical pans belong to us here. */
+export const DragZone = styled.div`
+  flex-shrink: 0;
+  touch-action: none;
+
+  ${({ theme }) => theme.media.up("md")} {
+    touch-action: auto;
+  }
+`;
+
+/** iOS-style grabber: only on the compact bottom sheet. */
+export const Grabber = styled.div`
+  width: calc(${({ theme }) => theme.space[32]} + ${({ theme }) => theme.space[8]});
+  height: ${({ theme }) => theme.space[4]};
+  margin: ${({ theme }) => theme.space[8]} auto 0;
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ theme }) => theme.colors.border.control};
+  opacity: 0.6;
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: none;
   }
 `;
 
@@ -82,6 +108,7 @@ export const Body = styled.div`
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: ${({ theme }) => theme.space[16]};
   display: flex;
   flex-direction: column;

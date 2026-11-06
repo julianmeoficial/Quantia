@@ -43,6 +43,7 @@ const Frame = styled.div<{ $fill: boolean }>`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   min-width: 0;
   max-width: 100%;
   background: ${({ theme }) => theme.colors.bg.canvas};
@@ -90,7 +91,12 @@ const Body = styled.div`
   gap: ${({ theme }) => theme.space[24]};
   min-width: 0;
   max-width: 100%;
-  padding: ${({ theme }) => theme.space[16]};
+  /* Phones and tablets: Main already insets the content; a second gutter wastes 32 px. */
+  padding: 0;
+
+  ${({ theme }) => theme.media.up("lg")} {
+    padding: ${({ theme }) => theme.space[16]};
+  }
 `;
 
 /* The fixed 240 px sidebar needs a desktop width: tablets (768–1279) use the drawer so the
@@ -135,12 +141,19 @@ const Main = styled.main<{ $fill: boolean }>`
     padding: ${({ theme }) => theme.space[32]};
   }
 
+  /* DESIGN.md type/page: 24/32 on phones, 32/40 from md. */
   h1 {
     margin: 0;
-    font-size: ${({ theme }) => theme.typography.headingLarge.fontSize};
-    line-height: ${({ theme }) => theme.typography.headingLarge.lineHeight};
+    font-size: ${({ theme }) => theme.typography.headingMedium.fontSize};
+    line-height: ${({ theme }) => theme.typography.headingMedium.lineHeight};
     font-weight: ${({ theme }) => theme.typography.headingLarge.fontWeight};
+    letter-spacing: -0.01em;
     color: ${({ theme }) => theme.colors.text.primary};
+
+    ${({ theme }) => theme.media.up("md")} {
+      font-size: ${({ theme }) => theme.typography.headingLarge.fontSize};
+      line-height: ${({ theme }) => theme.typography.headingLarge.lineHeight};
+    }
   }
 
   p {

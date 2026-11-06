@@ -5,7 +5,15 @@ import type {
   GeneralChatMessageDto,
   GeneralChatReactionSummary,
 } from "@quantia/contracts";
-import { AnimatePresence, motion, useAnimate, useMotionValue, useTransform } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useAnimate,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useTransform,
+} from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Avatar, Button, IconButton } from "@/components/base";
@@ -13,19 +21,24 @@ import {
   CheckDoubleIcon,
   CheckIcon,
   ClockIcon,
+  CopyIcon,
   EditIcon,
   ReplyIcon,
   SmileIcon,
   TrashIcon,
 } from "@/components/base/icons";
-import { useCoarsePointer } from "@/lib/device";
+import { haptic, useCoarsePointer } from "@/lib/device";
 import { formatTime } from "@/lib/format";
-import { transitions } from "@/lib/motion";
+import { gsapDurations, transitions } from "@/lib/motion";
 
 import * as S from "./ChatMessage.styles";
 
 /** Leftward drag (px) that triggers a reply on touch. */
 const SWIPE_REPLY_PX = 64;
+/** Touch hold (ms) that opens the message actions, like iOS context menus. */
+const LONG_PRESS_MS = 420;
+/** Finger travel (px) that turns a hold into a scroll or swipe. */
+const PRESS_SLOP_PX = 8;
 
 export type ChatDeliveryState = "sending" | "sent" | "failed";
 
@@ -77,11 +90,16 @@ function ReactionChip({
   onToggle?: () => void;
 }) {
   const [scope, animate] = useAnimate<HTMLButtonElement>();
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    if (popToken === null || !scope.current) return;
-    void animate(scope.current, { scale: [1, 1.22, 1] }, { duration: 0.25, ease: "easeOut" });
-  }, [animate, popToken, scope]);
+    if (popToken === null || !scope.current || reduceMotion) return;
+    void animate(
+      scope.current,
+      { scale: [1, 1.22, 1] },
+      { duration: gsapDurations.slow, ease: "easeOut" },
+    );
+  }, [animate, popToken, reduceMotion, scope]);
 
   const label = `${reaction.emoji} ${reaction.count} ${reaction.count === 1 ? "reacción" : "reacciones"}${mine ? ", incluida la tuya" : ""}`;
 
@@ -115,6 +133,22 @@ function ReactionChip({
         </AnimatePresence>
       </S.ChipCount>
     </S.Chip>
+  );
+}
+
+/** Quote-jump locate: animated fade unless the user prefers reduced motion (static outline). */
+function LocateHighlight() {
+  const reduceMotion = useReducedMotion();
+  if (reduceMotion) {
+    return <S.Highlight aria-hidden $static />;
+  }
+  return (
+    <S.Highlight
+      aria-hidden
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 1, 1, 0] }}
+      transition={{ duration: 1.6, times: [0, 0.12, 0.7, 1], ease: "easeInOut" }}
+    />
   );
 }
 
@@ -202,6 +236,45 @@ export function ChatMessage({
   const hintScale = useTransform(dragX, [-SWIPE_REPLY_PX, 0], [1, 0.6]);
   // The glyph is a child of the sliding row; cancel the drag so it stays pinned to the edge.
   const hintX = useTransform(dragX, (value) => -value);
+  // One tick when the swipe crosses the reply threshold (and again if it comes back past it).
+  const armed = useRef(false);
+  useMotionValueEvent(dragX, "change", (value) => {
+    const past = value <= -SWIPE_REPLY_PX;
+    if (past !== armed.current) {
+      armed.current = past;
+      if (past) haptic("selection");
+    }
+  });
+
+  // Touch: hold to reveal the actions. Mouse/trackpad use hover; keyboard uses focus.
+  const pressTimer = useRef<number | null>(null);
+  const pressOrigin = useRef<{ x: number; y: number } | null>(null);
+  const cancelPress = () => {
+    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+    pressOrigin.current = null;
+  };
+  useEffect(() => cancelPress, []);
+
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      haptic("success");
+      setCopied(true);
+    } catch {
+      haptic("warning");
+    }
+  };
+  const react = (emoji: ChatGeneralReaction) => {
+    haptic("selection");
+    onReact?.(emoji);
+  };
 
   function closePicker(restoreFocus: boolean) {
     setPickerOpen(false);
@@ -214,7 +287,28 @@ export function ChatMessage({
       $group={groupPosition}
       data-delivery={deliveryState}
       data-actions={actionsVisible || pickerOpen ? "open" : undefined}
-      onPointerDown={onActivate}
+      onPointerDown={(event) => {
+        if (event.pointerType !== "touch" || !hasActions || !onActivate) return;
+        pressOrigin.current = { x: event.clientX, y: event.clientY };
+        pressTimer.current = window.setTimeout(() => {
+          pressTimer.current = null;
+          haptic("light");
+          onActivate();
+        }, LONG_PRESS_MS);
+      }}
+      onPointerMove={(event) => {
+        const origin = pressOrigin.current;
+        if (!origin) return;
+        if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > PRESS_SLOP_PX) {
+          cancelPress();
+        }
+      }}
+      onPointerUp={cancelPress}
+      onPointerCancel={cancelPress}
+      onContextMenu={(event) => {
+        // Android/Chrome long-press menu would fight our own actions.
+        if (coarse && hasActions) event.preventDefault();
+      }}
       drag={swipeToReply ? "x" : false}
       dragDirectionLock
       dragConstraints={{ left: 0, right: 0 }}
@@ -223,7 +317,7 @@ export function ChatMessage({
       style={swipeToReply ? { x: dragX } : undefined}
       onDragEnd={(_, info) => {
         if (info.offset.x <= -SWIPE_REPLY_PX) {
-          if (typeof navigator !== "undefined") navigator.vibrate?.(8);
+          haptic("light");
           onReply?.();
         }
       }}
@@ -255,15 +349,7 @@ export function ChatMessage({
 
         <S.BubbleRow $own={isOwn}>
           <S.Bubble $own={isOwn} $group={groupPosition} $editing={isEditing} $sending={sending}>
-            {highlightToken > 0 ? (
-              <S.Highlight
-                key={highlightToken}
-                aria-hidden
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 1, 1, 0] }}
-                transition={{ duration: 1.6, times: [0, 0.12, 0.7, 1], ease: "easeInOut" }}
-              />
-            ) : null}
+            {highlightToken > 0 ? <LocateHighlight key={highlightToken} /> : null}
 
             {message.replyTo ? (
               <S.Quote
@@ -322,6 +408,12 @@ export function ChatMessage({
                   onClick={() => setPickerOpen((open) => !open)}
                 />
               ) : null}
+              <IconButton
+                accessibleLabel={copied ? "Texto copiado" : "Copiar texto"}
+                title={copied ? "Copiado" : "Copiar"}
+                icon={copied ? <CheckIcon /> : <CopyIcon />}
+                onClick={() => void copyText()}
+              />
               {onReply ? (
                 <IconButton
                   accessibleLabel="Responder"
@@ -378,7 +470,7 @@ export function ChatMessage({
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.92 }}
                     onClick={() => {
-                      onReact?.(emoji);
+                      react(emoji);
                       closePicker(true);
                     }}
                   >
@@ -399,7 +491,7 @@ export function ChatMessage({
                   reaction={reaction}
                   mine={Boolean(meId && reaction.userIds.includes(meId))}
                   popToken={pop && pop.emoji === reaction.emoji ? pop.token : null}
-                  onToggle={canReact ? () => onReact?.(reaction.emoji) : undefined}
+                  onToggle={canReact ? () => react(reaction.emoji) : undefined}
                 />
               ))}
             </AnimatePresence>

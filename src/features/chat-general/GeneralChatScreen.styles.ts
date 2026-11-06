@@ -6,20 +6,55 @@ import { focusRing } from "@/components/base/shared/focus";
 export const Screen = styled.section`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space[16]};
+  gap: ${({ theme }) => theme.space[8]};
   flex: 1;
   min-height: 0;
   /* The shell is locked to the viewport on this route: the log scrolls, never the page. */
   height: 100%;
-  min-height: calc(${({ theme }) => theme.space[64]} * 6);
+  /* Small enough to fit above an open phone keyboard (layout viewport shrinks). */
+  min-height: calc(${({ theme }) => theme.space[64]} * 4);
+
+  ${({ theme }) => theme.media.up("md")} {
+    gap: ${({ theme }) => theme.space[16]};
+  }
 `;
 
+/** Phones: one compact row (title + presence + avatar). Desktop: title, lead and actions. */
 export const Header = styled.header`
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: space-between;
-  gap: ${({ theme }) => theme.space[12]};
+  gap: ${({ theme }) => theme.space[8]};
+  min-width: 0;
+
+  h1 {
+    overflow: hidden;
+    font-size: ${({ theme }) => theme.typography.headingSmall.fontSize};
+    line-height: ${({ theme }) => theme.typography.headingSmall.lineHeight};
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  ${({ theme }) => theme.media.up("md")} {
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: ${({ theme }) => theme.space[12]};
+
+    h1 {
+      font-size: ${({ theme }) => theme.typography.headingLarge.fontSize};
+      line-height: ${({ theme }) => theme.typography.headingLarge.lineHeight};
+      white-space: normal;
+    }
+  }
+`;
+
+export const HideOnPhone = styled.span`
+  display: none;
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: inline;
+  }
 `;
 
 export const HeaderText = styled.div`
@@ -30,7 +65,13 @@ export const HeaderText = styled.div`
 `;
 
 export const Lead = styled.p`
+  display: none;
   margin: 0;
+
+  ${({ theme }) => theme.media.up("md")} {
+    display: block;
+  }
+
   color: ${({ theme }) => theme.colors.text.secondary};
   font-size: ${({ theme }) => theme.typography.bodyMedium.fontSize};
   line-height: ${({ theme }) => theme.typography.bodyMedium.lineHeight};
@@ -38,7 +79,8 @@ export const Lead = styled.p`
 
 export const HeaderActions = styled.div`
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
+  flex-wrap: nowrap;
   align-items: center;
   gap: ${({ theme }) => theme.space[8]};
 `;
@@ -71,17 +113,35 @@ export const Layout = styled.div`
   }
 `;
 
+/** Phones: edge to edge, no card (every pixel goes to the conversation). `md`+: a card. */
 export const Panel = styled.div`
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  margin: 0 calc(${({ theme }) => theme.space[16]} * -1)
+    calc(${({ theme }) => theme.space[16]} * -1);
   background: ${({ theme }) => theme.colors.bg.surface};
-  border: ${({ theme }) => theme.borderWidths.thin} solid
+  border-top: ${({ theme }) => theme.borderWidths.thin} solid
     ${({ theme }) => theme.colors.border.subtle};
-  border-radius: ${({ theme }) => theme.radii.featured};
   overflow: hidden;
+
+  ${({ theme }) => theme.media.up("md")} {
+    margin: 0;
+    border: ${({ theme }) => theme.borderWidths.thin} solid
+      ${({ theme }) => theme.colors.border.subtle};
+    border-radius: ${({ theme }) => theme.radii.featured};
+  }
+`;
+
+/** Messages + typing + «new messages» pill; the pill floats above the composer, never on it. */
+export const LogArea = styled.div`
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 `;
 
 export const Rail = styled.aside`
@@ -212,9 +272,13 @@ export const EmptyWrap = styled.div`
 
 export const ComposerSlot = styled.div`
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: ${({ theme }) => theme.space[4]};
-  padding: 0 ${({ theme }) => theme.space[12]} ${({ theme }) => theme.space[12]};
+
+  ${({ theme }) => theme.media.up("md")} {
+    padding: 0 ${({ theme }) => theme.space[12]} ${({ theme }) => theme.space[12]};
+  }
 `;
 
 export const Notice = styled(motion.div)<{ $tone: "error" | "info" }>`
@@ -237,8 +301,8 @@ export const PillSlot = styled.div`
   position: absolute;
   left: 0;
   right: 0;
-  bottom: ${({ theme }) => theme.space[16]};
-  z-index: ${({ theme }) => theme.zIndices.overlay};
+  bottom: ${({ theme }) => theme.space[12]};
+  z-index: ${({ theme }) => theme.zIndices.sticky};
   display: flex;
   justify-content: center;
   pointer-events: none;
